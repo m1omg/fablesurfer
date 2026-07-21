@@ -59,10 +59,32 @@ $("menu-hi").textContent = hiScore;
 var canvas   = $("game");
 var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// hex colors below are authored in sRGB; convert so the sRGB output pass
+// doesn't wash them out
+function conv(c) { return new THREE.Color(c).convertSRGBToLinear(); }
 
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87c9ff);
-scene.fog = new THREE.Fog(0x87c9ff, 55, 150);
+(function goldenHourSky() {
+  var c = document.createElement("canvas"); c.width = 16; c.height = 256;
+  var g2 = c.getContext("2d");
+  var gr = g2.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0.00, "#1d3c7d");
+  gr.addColorStop(0.42, "#4f7ac4");
+  gr.addColorStop(0.66, "#93b2e0");
+  gr.addColorStop(0.84, "#ffd9a8");
+  gr.addColorStop(1.00, "#ffb877");
+  g2.fillStyle = gr; g2.fillRect(0, 0, 16, 256);
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  scene.background = tex;
+})();
+scene.fog = new THREE.Fog(conv(0xffc99a), 45, 140);
 
 var camera = new THREE.PerspectiveCamera(68, 1, 0.1, 400);
 camera.position.set(0, 5, 8.2);
@@ -76,34 +98,109 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x8a7f6a, 1.05));
-var sun = new THREE.DirectionalLight(0xfff2d9, 0.85);
-sun.position.set(30, 60, 25);
+scene.add(new THREE.HemisphereLight(conv(0x8fb4e8), conv(0x6b5138), 0.85));
+var sun = new THREE.DirectionalLight(conv(0xffd9a0), 1.35);
+sun.position.set(-30, 27, -26);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 60;  sun.shadow.camera.bottom = -60;
+sun.shadow.camera.near = 2;  sun.shadow.camera.far = 160;
+sun.shadow.bias = -0.0004;
 scene.add(sun);
+scene.add(sun.target);
+
+// low evening sun visible down the tracks
+(function sunDisc() {
+  var disc = new THREE.Mesh(new THREE.CircleGeometry(16, 24),
+    new THREE.MeshBasicMaterial({ color: 0xfff3cd, fog: false }));
+  disc.position.set(-30, 30, -300);
+  scene.add(disc);
+  var halo = new THREE.Mesh(new THREE.CircleGeometry(34, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: false, transparent: true, opacity: 0.14 }));
+  halo.position.set(-30, 30, -301);
+  scene.add(halo);
+})();
 
 /* ------------------------------------------------------------------ *
  *  Shared materials / geometries
  * ------------------------------------------------------------------ */
-function lam(c) { return new THREE.MeshLambertMaterial({ color: c }); }
+function lam(c) { return new THREE.MeshLambertMaterial({ color: conv(c) }); }
+function shade(c, f) { return conv(c).multiplyScalar(f); }
 
 var MAT = {
-  ballast:  lam(0x5c5852),
-  tie:      lam(0x3d3129),
-  rail:     lam(0xb8bcc4),
-  fence:    lam(0x88919b),
-  hurdleW:  lam(0xd9a441),
-  hurdleS:  lam(0xc8352c),
-  post:     lam(0x666e78),
-  bar:      lam(0xd23c30),
-  coin:     new THREE.MeshLambertMaterial({ color: 0xffd23f, emissive: 0x8a5a00 }),
+  ballast:  lam(0x4a443c),
+  tie:      lam(0x33231a),
+  rail:     lam(0xd8dde6),
+  wall:     lam(0x968e80),
+  hurdleW:  lam(0xe8a72e),
+  hurdleS:  lam(0xd8352a),
+  post:     lam(0x555d68),
+  bar:      lam(0xd8352a),
+  coin:     new THREE.MeshPhongMaterial({ color: conv(0xffce2e), emissive: conv(0x7a4c00),
+              specular: conv(0xfff2b0), shininess: 90 }),
   skin:     lam(0xe8b58a),
-  board:    new THREE.MeshLambertMaterial({ color: 0x37e6c8, emissive: 0x0a5c4d }),
+  board:    new THREE.MeshLambertMaterial({ color: conv(0x28e0c0), emissive: conv(0x0a5c4d) }),
 };
 
-var trainColors = [0xd94141, 0x3f7fd4, 0x3fae5c, 0xe08b2d, 0x9a5fd0];
-var bldgColors  = [0xc9b8a3, 0xa3b6c9, 0xc0a3c9, 0xb0c9a3, 0xc9a3a3, 0x9aa7b5];
+var trainColors = [0xc93030, 0x2f6fd0, 0x2f9e50, 0xe0761f, 0x8a4fc9, 0x3a4750];
+var bldgColors  = [0xb5533c, 0xd9975f, 0x4f8a8b, 0x5a6b8c, 0xcdb98f, 0x8c5a7a];
 
-var coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.09, 14);
+var coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.09, 18);
+
+/* --- procedural textures ------------------------------------------- */
+// window grids drawn on white so material.color can tint the walls
+var windowTextures = (function () {
+  var out = [];
+  for (var v = 0; v < 4; v++) {
+    var c = document.createElement("canvas"); c.width = c.height = 128;
+    var g = c.getContext("2d");
+    g.fillStyle = "#ffffff"; g.fillRect(0, 0, 128, 128);
+    for (var row = 0; row < 4; row++) {
+      for (var col = 0; col < 4; col++) {
+        var x = 10 + col * 30, y = 10 + row * 30;
+        var r = Math.random();
+        g.fillStyle = r < 0.22 ? "#ffd9a0" :            // catching the sunset
+                      r < 0.34 ? "#7e94ad" : "#2c3a4d"; // glass
+        g.fillRect(x, y, 18, 22);
+        g.fillStyle = "rgba(0,0,0,0.25)";
+        g.fillRect(x, y + 18, 18, 4);                   // sill shadow
+      }
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    out.push(tex);
+  }
+  return out;
+})();
+
+// colorful (original) graffiti pieces for the trackside walls
+var graffitiTextures = (function () {
+  var out = [], colors = ["#ff4f9a", "#26d07c", "#3fa9ff", "#ffd23f", "#ff7a2e", "#b96bff"];
+  for (var v = 0; v < 3; v++) {
+    var c = document.createElement("canvas"); c.width = 256; c.height = 64;
+    var g = c.getContext("2d");
+    g.fillStyle = "#9a9388"; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = "rgba(0,0,0,0.08)";
+    for (var s = 0; s < 8; s++) g.fillRect(Math.random() * 256, 0, 2, 64);
+    for (var b = 0; b < 5; b++) {
+      var x = 12 + Math.random() * 200, y = 12 + Math.random() * 26;
+      var w = 24 + Math.random() * 46, h = 14 + Math.random() * 22;
+      g.strokeStyle = "#22222e"; g.lineWidth = 5;
+      g.fillStyle = colors[(Math.random() * colors.length) | 0];
+      g.beginPath();
+      g.ellipse(x, y + h / 2, w / 2, h / 2, (Math.random() - 0.5) * 0.5, 0, Math.PI * 2);
+      g.fill(); g.stroke();
+      g.fillStyle = "rgba(255,255,255,0.55)";
+      g.beginPath(); g.ellipse(x - w * 0.15, y + h * 0.3, w * 0.14, h * 0.16, 0, 0, Math.PI * 2); g.fill();
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    out.push(tex);
+  }
+  return out;
+})();
 
 /* ------------------------------------------------------------------ *
  *  Static / recycled environment
@@ -113,23 +210,40 @@ var coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.09, 14);
 (function buildStatic() {
   var slab = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.3, 320), MAT.ballast);
   slab.position.set(0, -0.15, -130);
+  slab.receiveShadow = true;
   scene.add(slab);
-  var side = new THREE.Mesh(new THREE.BoxGeometry(30, 0.28, 320), lam(0x6f6a5f));
-  side.position.set(-19, -0.16, -130); scene.add(side);
+  var side = new THREE.Mesh(new THREE.BoxGeometry(30, 0.28, 320), lam(0x7d7365));
+  side.position.set(-19, -0.16, -130); side.receiveShadow = true; scene.add(side);
   side = side.clone(); side.position.x = 19; scene.add(side);
 
+  // platform safety lines
+  for (var s = -1; s <= 1; s += 2) {
+    var line = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 320), lam(0xe8c93f));
+    line.position.set(s * 5.2, 0.02, -130);
+    scene.add(line);
+  }
+
   for (var l = 0; l < 3; l++) {
-    for (var s = -1; s <= 1; s += 2) {
+    for (var s2 = -1; s2 <= 1; s2 += 2) {
       var rail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 320), MAT.rail);
-      rail.position.set(LANE_X[l] + s * 0.72, 0.06, -130);
+      rail.position.set(LANE_X[l] + s2 * 0.72, 0.06, -130);
       scene.add(rail);
     }
   }
-  // clouds
+  // warm evening clouds
   for (var i = 0; i < 7; i++) {
-    var cl = new THREE.Mesh(new THREE.BoxGeometry(9 + Math.random() * 8, 1.6, 3), lam(0xffffff));
-    cl.position.set(-60 + Math.random() * 120, 32 + Math.random() * 14, -140 - Math.random() * 60);
+    var cl = new THREE.Mesh(new THREE.BoxGeometry(9 + Math.random() * 10, 1.4, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffe2c4, fog: false, transparent: true, opacity: 0.45 }));
+    cl.position.set(-70 + Math.random() * 140, 42 + Math.random() * 20, -200 - Math.random() * 60);
     scene.add(cl);
+  }
+  // distant skyline silhhouettes, mostly swallowed by the haze
+  for (i = 0; i < 16; i++) {
+    var hgt = 18 + Math.random() * 34;
+    var far = new THREE.Mesh(new THREE.BoxGeometry(10 + Math.random() * 14, hgt, 10), lam(0x5a6b8c));
+    var sd = Math.random() < 0.5 ? -1 : 1;
+    far.position.set(sd * (34 + Math.random() * 40), hgt / 2, -90 - Math.random() * 90);
+    scene.add(far);
   }
 })();
 
@@ -139,17 +253,24 @@ var ties = [];
   for (var i = 0; i < 90; i++) {
     var t = new THREE.Mesh(g, MAT.tie);
     t.position.set(0, 0.01, 14 - i * 2.4);
+    t.receiveShadow = true;
     scene.add(t); ties.push(t);
   }
 })();
 
+// trackside concrete walls, some tagged with graffiti
 var fences = [];
 (function buildFences() {
-  var g = new THREE.BoxGeometry(0.25, 1.5, 11);
+  var g = new THREE.BoxGeometry(0.35, 2.1, 11);
   for (var i = 0; i < 22; i++) {
     for (var s = -1; s <= 1; s += 2) {
-      var f = new THREE.Mesh(g, MAT.fence);
-      f.position.set(s * 6.4, 0.75, 16 - i * 12);
+      var mat = (i + (s > 0 ? 1 : 0)) % 3 === 0
+        ? new THREE.MeshLambertMaterial({ map: graffitiTextures[(Math.random() * 3) | 0] })
+        : MAT.wall;
+      var f = new THREE.Mesh(g, mat);
+      f.position.set(s * 6.4, 1.05, 16 - i * 12);
+      f.receiveShadow = true;
+      f.castShadow = true;
       scene.add(f); fences.push(f);
     }
   }
@@ -160,13 +281,16 @@ function styleBuilding(b) {
   var w = 7 + Math.random() * 8, h = 8 + Math.random() * 22, d = 12 + Math.random() * 10;
   b.scale.set(w, h, d);
   b.position.y = h / 2 - 0.2;
-  b.material = lam(bldgColors[(Math.random() * bldgColors.length) | 0]);
+  b.material.color.copy(conv(bldgColors[(Math.random() * bldgColors.length) | 0]));
+  b.material.map.repeat.set(Math.max(1, Math.round(w / 6)), Math.max(1, Math.round(h / 6)));
 }
 (function buildBuildings() {
   var g = new THREE.BoxGeometry(1, 1, 1);
   for (var i = 0; i < 16; i++) {
     for (var s = -1; s <= 1; s += 2) {
-      var b = new THREE.Mesh(g, MAT.fence);
+      var tex = windowTextures[(Math.random() * windowTextures.length) | 0].clone();
+      tex.needsUpdate = true;
+      var b = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
       styleBuilding(b);
       b.position.x = s * (13.5 + Math.random() * 5);
       b.position.z = 20 - i * 24 + (s > 0 ? 9 : 0);
@@ -178,77 +302,153 @@ function styleBuilding(b) {
 /* ------------------------------------------------------------------ *
  *  Character builder (player, inspector)
  * ------------------------------------------------------------------ */
-function limb(w, len, d, mat, x, y, z) {
-  var g = new THREE.BoxGeometry(w, len, d);
-  g.translate(0, -len / 2, 0);            // pivot at the top
-  var m = new THREE.Mesh(g, mat);
-  m.position.set(x, y, z);
-  return m;
-}
+var LEAN = 0.14;   // forward sprint lean of the torso group
 
 function buildRunner(opts) {
-  var body = new THREE.Group();           // rotates for the somersault
+  var body = new THREE.Group();           // rotates for the somersault / lean
   var g = new THREE.Group();              // world placement
   g.add(body);
+  body.rotation.x = LEAN;
 
-  var shirt = lam(opts.shirt), pants = lam(opts.pants), capM = lam(opts.cap);
+  var shirt = lam(opts.shirt), pants = lam(opts.pants),
+      shoes = lam(opts.shoes), capM = lam(opts.cap);
+  var beefy = opts.beefy ? 1.18 : 1;
 
-  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.8, 0.42), shirt);
-  torso.position.y = 1.16; body.add(torso);
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * beefy, 0.37 * beefy, 0.74, 10), shirt);
+  torso.position.y = 1.14; body.add(torso);
+  var hips = new THREE.Mesh(new THREE.BoxGeometry(0.44 * beefy, 0.2, 0.32), pants);
+  hips.position.y = 0.74; body.add(hips);
+  // hood resting on the shoulders
+  var hood = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), shirt);
+  hood.scale.set(1, 0.55, 0.9);
+  hood.position.set(0, 1.56, 0.12); body.add(hood);
 
-  var pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.22), lam(opts.pack));
-  pack.position.set(0, 1.2, 0.3); body.add(pack);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 12), MAT.skin);
+  head.position.y = 1.88; body.add(head);
+  var capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.275, 0.14, 12), capM);
+  capTop.position.y = 2.06; body.add(capTop);
+  var dome = new THREE.Mesh(new THREE.SphereGeometry(0.265, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), capM);
+  dome.position.y = 2.1; body.add(dome);
+  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.3), capM);
+  brim.position.set(0, 2.02, opts.brimForward ? -0.36 : 0.36);   // backwards cap for the surfer
+  body.add(brim);
 
-  var head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.44), MAT.skin);
-  head.position.y = 1.85; body.add(head);
+  if (opts.pack) {
+    var pack = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.52, 0.2), lam(opts.pack));
+    pack.position.set(0, 1.22, 0.32); body.add(pack);
+    for (var s = -1; s <= 1; s += 2) {                            // spray cans poking out
+      var can = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.2, 8),
+        lam(s < 0 ? 0xff4f9a : 0x26d07c));
+      can.position.set(s * 0.12, 1.55, 0.32); body.add(can);
+    }
+  }
+  if (opts.badge) {
+    var badge = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.03), lam(0xe8c93f));
+    badge.position.set(-0.15, 1.32, -0.35 * beefy); body.add(badge);
+  }
 
-  var capTop = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.16, 0.48), capM);
-  capTop.position.y = 2.11; body.add(capTop);
-  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.26), capM);
-  brim.position.set(0, 2.06, -0.34); body.add(brim);
+  function armAt(sx) {
+    var arm = new THREE.Group();
+    arm.position.set(sx * 0.44 * beefy, 1.46, 0);
+    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.3, 4, 8), shirt);
+    upper.position.y = -0.19; arm.add(upper);
+    var fore = new THREE.Group(); fore.position.y = -0.38;
+    fore.rotation.x = -0.85;                                      // pumping elbows
+    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.24, 4, 8), shirt);
+    lower.position.y = -0.15; fore.add(lower);
+    var hand = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 6), MAT.skin);
+    hand.position.y = -0.32; fore.add(hand);
+    arm.add(fore);
+    arm.rotation.z = sx * -0.12;
+    body.add(arm);
+    return arm;
+  }
+  function legAt(sx) {
+    var thigh = new THREE.Group();
+    thigh.position.set(sx * 0.16, 0.8, 0);
+    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.28, 4, 8), pants);
+    upper.position.y = -0.18; thigh.add(upper);
+    var shin = new THREE.Group(); shin.position.y = -0.4;
+    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.24, 4, 8), pants);
+    lower.position.y = -0.15; shin.add(lower);
+    var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.11, 0.3), shoes);
+    shoe.position.set(0, -0.33, -0.05); shin.add(shoe);
+    thigh.add(shin);
+    body.add(thigh);
+    return { thigh: thigh, shin: shin };
+  }
 
-  var armL = limb(0.18, 0.62, 0.18, shirt, -0.47, 1.52, 0); body.add(armL);
-  var armR = limb(0.18, 0.62, 0.18, shirt,  0.47, 1.52, 0); body.add(armR);
-  var legL = limb(0.22, 0.78, 0.22, pants, -0.19, 0.78, 0); body.add(legL);
-  var legR = limb(0.22, 0.78, 0.22, pants,  0.19, 0.78, 0); body.add(legR);
+  var armL = armAt(-1), armR = armAt(1);
+  var legL = legAt(-1), legR = legAt(1);
 
-  return { group: g, body: body, armL: armL, armR: armR, legL: legL, legR: legR };
+  g.traverse(function (m) { if (m.isMesh) m.castShadow = true; });
+  return { group: g, body: body,
+           armL: armL, armR: armR,
+           thighL: legL.thigh, shinL: legL.shin,
+           thighR: legR.thigh, shinR: legR.shin };
 }
 
 function animateRun(r, phase, amp) {
-  r.armL.rotation.x =  Math.sin(phase) * amp;
-  r.armR.rotation.x = -Math.sin(phase) * amp;
-  r.legL.rotation.x = -Math.sin(phase) * amp;
-  r.legR.rotation.x =  Math.sin(phase) * amp;
+  var s = Math.sin(phase);
+  r.armL.rotation.x = -s * amp * 0.9;
+  r.armR.rotation.x =  s * amp * 0.9;
+  r.thighL.rotation.x =  s * amp;
+  r.thighR.rotation.x = -s * amp;
+  // knees bend as each leg swings through recovery
+  r.shinL.rotation.x = -Math.max(0, Math.sin(phase + 2.2)) * amp * 1.15;
+  r.shinR.rotation.x = -Math.max(0, Math.sin(phase + 2.2 + Math.PI)) * amp * 1.15;
+  r.body.position.y = Math.abs(Math.cos(phase)) * 0.05;
 }
 
-var player = buildRunner({ shirt: 0x00b8e6, pants: 0x2d4a8a, cap: 0xe23a3a, pack: 0xe0a92d });
-scene.add(player.group);
+function poseAirborne(r) {
+  r.thighL.rotation.x = 1.2;  r.shinL.rotation.x = -1.9;   // lead knee tucked
+  r.thighR.rotation.x = -0.3; r.shinR.rotation.x = -0.5;
+  r.armL.rotation.x = 2.4;    r.armR.rotation.x = 2.1;     // arms flung up
+  r.body.position.y = 0;
+}
 
-var blob = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.55, 0.55, 0.02, 16),
-  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 }));
-scene.add(blob);
+var player = buildRunner({
+  shirt: 0x00a8d8, pants: 0x35508f, shoes: 0xf2f2f2,
+  cap: 0xe23a3a, pack: 0xe0a92d, brimForward: false,
+});
+scene.add(player.group);
 
 var board = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 1.5), MAT.board);
 board.visible = false;
+board.castShadow = true;
 scene.add(board);
 
 // the inspector + dog, chasing behind
-var guard = buildRunner({ shirt: 0x2a3b66, pants: 0x1c2846, cap: 0x2a3b66, pack: 0x1c2846 });
+var guard = buildRunner({
+  shirt: 0x2b3a63, pants: 0x1f2a47, shoes: 0x22252a,
+  cap: 0x2b3a63, brimForward: true, beefy: true, badge: true,
+});
 scene.add(guard.group);
+
 var dog = (function () {
   var g = new THREE.Group();
-  var bodyM = lam(0x8a6034);
-  var b = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.34, 0.8), bodyM);
-  b.position.y = 0.42; g.add(b);
-  var h = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.34), bodyM);
-  h.position.set(0, 0.62, -0.5); g.add(h);
+  var fur = lam(0x8a6034), dark = lam(0x5c3f20);
+  var b = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.5, 4, 8), fur);
+  b.rotation.x = Math.PI / 2; b.position.y = 0.42; g.add(b);
+  var h = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), fur);
+  h.position.set(0, 0.6, -0.42); g.add(h);
+  var snout = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.16), dark);
+  snout.position.set(0, 0.55, -0.58); g.add(snout);
+  for (var s = -1; s <= 1; s += 2) {
+    var ear = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.04), dark);
+    ear.position.set(s * 0.1, 0.75, -0.4); ear.rotation.z = s * -0.25; g.add(ear);
+  }
+  var collar = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.05, 10), lam(0xd8352a));
+  collar.rotation.x = 0.5; collar.position.set(0, 0.56, -0.32); g.add(collar);
+  var tail = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.26), dark);
+  tail.position.set(0, 0.55, 0.36); tail.rotation.x = -0.7; g.add(tail);
   for (var i = 0; i < 4; i++) {
-    var leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), bodyM);
-    leg.position.set(i % 2 ? 0.12 : -0.12, 0.15, i < 2 ? -0.28 : 0.28);
+    var leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.18, 4, 6), fur);
+    leg.position.set(i % 2 ? 0.11 : -0.11, 0.16, i < 2 ? -0.22 : 0.24);
     g.add(leg);
   }
+  g.traverse(function (m) { if (m.isMesh) m.castShadow = true; });
+  g.userData.tail = tail;
   scene.add(g);
   return g;
 })();
@@ -264,19 +464,45 @@ function makeTrain(lane, z, len, opts) {
   var bodyLen = opts.ramp ? len - RAMP_LEN : len;
   var bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, TRAIN_H, bodyLen), lam(color));
   bodyMesh.position.set(0, TRAIN_H / 2, opts.ramp ? -RAMP_LEN / 2 : 0);
+  bodyMesh.castShadow = bodyMesh.receiveShadow = true;
   g.add(bodyMesh);
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.2, 0.12, bodyLen - 0.2), lam(0xd8d8d8));
-  roof.position.set(0, TRAIN_H + 0.06, bodyMesh.position.z);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.16, 0.14, bodyLen - 0.2), lam(0xb8bdc4));
+  roof.position.set(0, TRAIN_H + 0.07, bodyMesh.position.z);
+  roof.receiveShadow = true;
   g.add(roof);
+  // dark under-skirt grounds the car visually
+  var skirt = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.06, 0.5, bodyLen - 0.3),
+    lam(0x23262b));
+  skirt.position.set(0, 0.25, bodyMesh.position.z);
+  g.add(skirt);
+  // white livery stripe
+  var stripe = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.05, 0.24, bodyLen - 0.4),
+    lam(0xf2ede4));
+  stripe.position.set(0, 1.05, bodyMesh.position.z);
+  g.add(stripe);
+  // window band, tinted by the sunset
   var win = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.04, 0.55, bodyLen - 1),
-                           lam(0xbfe3f2));
-  win.position.set(0, TRAIN_H * 0.62, bodyMesh.position.z);
+    new THREE.MeshLambertMaterial({ color: conv(0x2c3e50), emissive: conv(0x8a5a30),
+      emissiveIntensity: 0.25 }));
+  win.position.set(0, TRAIN_H * 0.66, bodyMesh.position.z);
   g.add(win);
+  // sliding doors
+  var doorMat = new THREE.MeshLambertMaterial({ color: shade(color, 0.62) });
+  var nDoors = Math.max(1, Math.round(bodyLen / 7));
+  for (var d = 0; d < nDoors; d++) {
+    for (var sSign = -1; sSign <= 1; sSign += 2) {
+      var door = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.7, 1.1), doorMat);
+      door.position.set(sSign * (TRAIN_W + 0.02), 1.15,
+        bodyMesh.position.z - bodyLen / 2 + (d + 0.5) * (bodyLen / nDoors));
+      g.add(door);
+    }
+  }
   if (opts.ramp) {
     // sloped tail the runner can sprint up
     var ramp = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, 0.25, Math.hypot(RAMP_LEN, TRAIN_H) + 0.4), lam(0x777d85));
     ramp.position.set(0, TRAIN_H / 2, len / 2 - RAMP_LEN / 2);
     ramp.rotation.x = Math.atan2(TRAIN_H, RAMP_LEN);
+    ramp.castShadow = ramp.receiveShadow = true;
     g.add(ramp);
   }
   if (opts.moving) {
@@ -303,6 +529,7 @@ function makeHurdle(lane, z) {
     g.add(legMesh);
   }
   g.position.set(LANE_X[lane], 0, z);
+  g.traverse(function (m) { if (m.isMesh) m.castShadow = true; });
   scene.add(g);
   obstacles.push({ kind: "hurdle", mesh: g, lane: lane, halfLen: 0.22, moving: 0 });
 }
@@ -320,6 +547,7 @@ function makeOverhang(lane, z) {
     g.add(postMesh);
   }
   g.position.set(LANE_X[lane], 0, z);
+  g.traverse(function (m) { if (m.isMesh) m.castShadow = true; });
   scene.add(g);
   obstacles.push({ kind: "overhang", mesh: g, lane: lane, halfLen: 0.28, moving: 0 });
 }
@@ -353,9 +581,39 @@ var PU_DEFS = {
 function makePowerup(lane, z, type) {
   var def = PU_DEFS[type];
   var g = new THREE.Group();
-  var core = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55),
-    new THREE.MeshLambertMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.35 }));
-  core.rotation.set(0.6, 0.6, 0);
+  var core = new THREE.Group();
+  var glow = new THREE.MeshLambertMaterial({ color: conv(def.color),
+    emissive: conv(def.color), emissiveIntensity: 0.4 });
+  var chrome = lam(0xd8dde6);
+
+  if (type === "magnet") {                       // horseshoe magnet
+    var u = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.1, 8, 14, Math.PI), glow);
+    u.rotation.z = Math.PI; core.add(u);
+    for (var s = -1; s <= 1; s += 2) {
+      var tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.16, 0.2), chrome);
+      tip.position.set(s * 0.26, 0.08, 0); core.add(tip);
+    }
+  } else if (type === "sneakers") {              // springy sneaker
+    var sole = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.56), chrome);
+    sole.position.y = -0.12; core.add(sole);
+    var upper = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.4), glow);
+    upper.position.set(0, 0.03, 0.05); core.add(upper);
+    var cuff = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.18), glow);
+    cuff.position.set(0, 0.18, 0.16); core.add(cuff);
+  } else if (type === "mult") {                  // score gem
+    core.add(new THREE.Mesh(new THREE.OctahedronGeometry(0.34), glow));
+  } else {                                       // jetpack
+    for (var s2 = -1; s2 <= 1; s2 += 2) {
+      var tank = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.44, 10), glow);
+      tank.position.x = s2 * 0.13; core.add(tank);
+      var nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.14, 8), chrome);
+      nozzle.rotation.x = Math.PI; nozzle.position.set(s2 * 0.13, -0.29, 0); core.add(nozzle);
+      var flame = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffb347 }));
+      flame.rotation.x = Math.PI; flame.position.set(s2 * 0.13, -0.44, 0); core.add(flame);
+    }
+  }
+  core.traverse(function (m) { if (m.isMesh) m.castShadow = true; });
   g.add(core);
   g.position.set(LANE_X[lane], 1.25, z);
   scene.add(g);
@@ -468,15 +726,20 @@ function spawnPattern(z) {
 /* ------------------------------------------------------------------ *
  *  Audio — tiny WebAudio synth
  * ------------------------------------------------------------------ */
-var actx = null, musicOn = true, musicTimer = null, musicBeat = 0;
+var actx = null, musicGain = null, musicOn = true, musicTimer = null;
 function audio() {
   if (!actx) {
-    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      musicGain = actx.createGain();
+      musicGain.gain.value = 1;
+      musicGain.connect(actx.destination);
+    } catch (e) {}
   }
   if (actx && actx.state === "suspended") actx.resume();
   return actx;
 }
-function beep(freq, dur, type, vol, slideTo, when) {
+function beep(freq, dur, type, vol, slideTo, when, toMusic) {
   var ctx = audio(); if (!ctx) return;
   var t = when || ctx.currentTime;
   var o = ctx.createOscillator(), g = ctx.createGain();
@@ -485,8 +748,25 @@ function beep(freq, dur, type, vol, slideTo, when) {
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
   g.gain.setValueAtTime(vol || 0.12, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.connect(g); g.connect(ctx.destination);
+  o.connect(g); g.connect(toMusic ? musicGain : ctx.destination);
   o.start(t); o.stop(t + dur + 0.02);
+}
+var noiseBuf = null;
+function noiseHit(dur, filterType, filterFreq, vol, when) {
+  var ctx = audio(); if (!ctx) return;
+  if (!noiseBuf) {
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+    var data = noiseBuf.getChannelData(0);
+    for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  var t = when || ctx.currentTime;
+  var src = ctx.createBufferSource(); src.buffer = noiseBuf;
+  var f = ctx.createBiquadFilter(); f.type = filterType; f.frequency.value = filterFreq;
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f); f.connect(g); g.connect(musicGain);
+  src.start(t); src.stop(t + dur + 0.02);
 }
 var sfx = {
   coin:    function () { beep(1150, 0.07, "square", 0.06, 1500); },
@@ -498,15 +778,83 @@ var sfx = {
   stumble: function () { beep(140, 0.18, "sawtooth", 0.16, 70); },
   crash:   function () { beep(180, 0.4, "sawtooth", 0.2, 35); beep(90, 0.5, "square", 0.14, 30); },
 };
-// minimal original two-bar chiptune loop
-var BASS  = [110, 110, 165, 110, 131, 131, 98, 123];
-function musicTick() {
-  var ctx = audio(); if (!ctx || !musicOn || state !== "running") return;
-  var t = ctx.currentTime;
-  beep(BASS[musicBeat % 8], 0.16, "triangle", 0.05, null, t);
-  if (musicBeat % 2 === 0) beep(60, 0.1, "sine", 0.09, 40, t);         // kick
-  if (musicBeat % 4 === 2) beep(4000, 0.03, "square", 0.015, null, t); // hat
-  musicBeat++;
+/* Original generative chiptune: a 4-bar chord loop (Am–F–C–G) with a
+   pentatonic lead whose phrases reshuffle every loop, over kick/snare/hats.
+   A lookahead scheduler keeps timing sample-accurate. */
+function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+var PROG = [                          // per-bar: bass root (midi) + stab chord
+  { bass: 45, chord: [57, 60, 64] },  // Am
+  { bass: 41, chord: [53, 57, 60] },  // F
+  { bass: 48, chord: [55, 60, 64] },  // C
+  { bass: 43, chord: [55, 59, 62] },  // G
+];
+var BASS_STEPS = [0, 0, 12, 0, 0, 7, 0, 12];       // octave/fifth pops on the root
+var PHRASES = [                                    // A-minor pentatonic, 8 eighth-notes each
+  [69,  0, 72, 74,  0, 76, 74, 72],
+  [76,  0, 74, 72, 74,  0, 69,  0],
+  [79, 76,  0, 74, 76,  0, 72, 74],
+  [69, 72, 74, 76, 79,  0, 81, 79],
+  [ 0,  0, 76,  0,  0, 74,  0,  0],                // sparse breather
+];
+var PHRASE_ORDERS = [[0, 1, 0, 2], [0, 3, 1, 2], [2, 1, 4, 3], [0, 1, 3, 4]];
+var M_STEP_DUR = 0.165, M_SWING = 0.045;
+var mStep = 0, mNext = 0, mLoop = 0, mOrder = PHRASE_ORDERS[0];
+
+function playMusicStep(s, t) {
+  var bar = (s / 8) | 0, st = s % 8;
+  var pr = PROG[bar];
+
+  // drums
+  if (st === 0 || st === 4 || (bar % 2 === 1 && st === 7)) {
+    beep(150, 0.11, "sine", 0.12, 45, t, true);                        // kick
+  }
+  if (st === 2 || st === 6) {
+    noiseHit(0.09, "bandpass", 1800, 0.06, t);                         // snare
+    beep(190, 0.05, "triangle", 0.025, null, t, true);
+  }
+  noiseHit(st % 2 === 0 ? 0.03 : 0.02, "highpass", 7000,
+           st % 2 === 0 ? 0.02 : 0.011, t);                            // hats
+  if (st === 7 && bar === 3) noiseHit(0.12, "highpass", 6000, 0.02, t); // open hat turnaround
+
+  // bass
+  beep(mtof(pr.bass + BASS_STEPS[st]), 0.15, "triangle", 0.08, null, t, true);
+
+  // chord stabs on the off-beats
+  if (st === 0 || st === 3) {
+    for (var i = 0; i < pr.chord.length; i++) {
+      beep(mtof(pr.chord[i]), 0.09, "sawtooth", 0.013, null, t, true);
+    }
+  }
+
+  // lead (skip the first loop so the song builds)
+  if (mLoop > 0) {
+    var n = PHRASES[mOrder[bar]][st];
+    if (n) {
+      beep(mtof(n), 0.15, "square", 0.028, null, t, true);
+      beep(mtof(n + 12), 0.15, "triangle", 0.018, null, t, true);      // sparkle octave
+    }
+  }
+}
+
+function scheduleMusic() {
+  if (!actx || !musicOn || state !== "running") return;
+  var now = actx.currentTime;
+  if (mNext < now - 0.4) mNext = now + 0.05;       // resync after a pause
+  while (mNext < now + 0.35) {
+    playMusicStep(mStep, mNext + (mStep % 2 ? M_SWING : 0));
+    mStep = (mStep + 1) % 32;
+    if (mStep === 0) {
+      mLoop++;
+      mOrder = PHRASE_ORDERS[mLoop % PHRASE_ORDERS.length];
+    }
+    mNext += M_STEP_DUR;
+  }
+}
+
+function toggleMusic() {
+  musicOn = !musicOn;
+  if (musicGain) musicGain.gain.value = musicOn ? 1 : 0;
 }
 
 /* ------------------------------------------------------------------ *
@@ -530,7 +878,8 @@ function resetRun() {
   px = 0; py = 0; vy = 0; curLane = 1; targetLane = 1; prevLane = 1;
   grounded = true; coyote = 0; rollT = 0; runPhase = 0;
   stumbleT = 0; hitCooldown = 0; invincibleT = 0; dyingT = 0; caught = false;
-  guardZ = 3.2; boardT = 0; musicBeat = 0;
+  guardZ = 3.2; boardT = 0;
+  mStep = 0; mNext = 0; mLoop = 0;
   pu = { magnet: 0, sneakers: 0, mult: 0, jetpack: 0 };
 
   player.group.rotation.set(0, 0, 0);
@@ -554,7 +903,7 @@ function startGame() {
   elHud.classList.remove("hidden");
   audio();
   if (musicTimer) clearInterval(musicTimer);
-  musicTimer = setInterval(musicTick, 190);
+  musicTimer = setInterval(scheduleMusic, 90);
 }
 
 function endGame(wasCaught) {
@@ -663,6 +1012,7 @@ window.addEventListener("keydown", function (e) {
     case "ArrowUp": case "w": case "W": case " ": doJump(); break;
     case "ArrowDown": case "s": case "S": doRoll(); break;
     case "h": case "H": activateBoard(); break;
+    case "m": case "M": toggleMusic(); break;
     case "p": case "P": case "Escape": togglePause(); break;
   }
 });
@@ -874,29 +1224,25 @@ function updateVisuals(dt) {
     board.rotation.z = Math.sin(performance.now() / 180) * 0.06;
   }
 
-  blob.position.set(px, 0.02 + (py >= TRAIN_H - 0.5 ? TRAIN_H + 0.08 : 0), 0);
-  var sh = Math.max(0.25, 1 - py * 0.12);
-  blob.scale.set(sh, 1, sh);
-
   if (state === "dying") {
     // tumble over
     player.body.rotation.x -= 9 * dt;
     player.group.position.z += 3.5 * dt;
   } else if (rollT > 0) {
-    player.body.rotation.x = -(1 - rollT / ROLL_TIME) * Math.PI * 2;
+    player.body.rotation.x = LEAN - (1 - rollT / ROLL_TIME) * Math.PI * 2;
     player.body.scale.y = 0.55;
   } else {
-    player.body.rotation.x = 0;
+    player.body.rotation.x = LEAN;
     player.body.scale.y = 1;
     if (!grounded && pu.jetpack <= 0) {
-      // jump pose
-      player.legL.rotation.x = -1.1; player.legR.rotation.x = 0.5;
-      player.armL.rotation.x = -2.4; player.armR.rotation.x = -2.4;
+      poseAirborne(player);
     } else {
       runPhase += speed * dt * 0.85;
       animateRun(player, runPhase, 1.05);
     }
   }
+  // the dog's happy tail
+  dog.userData.tail.rotation.y = Math.sin(performance.now() / 90) * 0.5;
   // blink while invincible
   player.group.visible = invincibleT > 0 ? (Math.floor(performance.now() / 90) % 2 === 0) : true;
 
