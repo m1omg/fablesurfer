@@ -2,44 +2,47 @@ name: Deploy Fable Surfer to GitHub Pages
 
 # Roll out to Pages automatically on every push to the working branch,
 # plus a manual trigger from the Actions tab.
+#
+# Pages on this repo is configured with a *branch* source (gh-pages), so
+# we publish the static site there with the default GITHUB_TOKEN. That
+# push triggers GitHub's managed "pages build and deployment" pipeline,
+# which serves the site. (The Pages *API* enablement path needs admin
+# rights the Actions token doesn't have, so we deliberately avoid it.)
 on:
   push:
     branches: [claude/subway-surfers-overview-po5y8y]
   workflow_dispatch:
 
-# Least-privilege token: read the repo, write the Pages deployment.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# One live rollout at a time; a newer push supersedes an in-flight one.
+# One rollout at a time; a newer push supersedes an in-flight one.
 concurrency:
-  group: pages
+  group: pages-deploy
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Turns Pages on for the repo if it isn't already (source: Actions).
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      # Gather just the files the game needs into a clean publish root.
+      - name: Assemble static site
+        run: |
+          mkdir -p _site
+          cp index.html style.css README.md _site/
+          cp -r js vendor _site/
+          touch _site/.nojekyll   # serve files as-is, skip Jekyll
 
-      # The game is a static site at the repo root — upload it as-is.
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: .
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: "Deploy ${{ github.sha }}"

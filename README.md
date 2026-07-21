@@ -4,7 +4,10 @@ A browser-based endless runner in the spirit of *Subway Surfers* — built with
 Three.js, fully procedural art, and WebAudio-synthesised sound. No build step,
 no external assets, no network required.
 
-**Play it:** open `index.html` in any modern browser (double-click works), or serve it:
+**▶ Play online:** https://m1omg.github.io/fablesurfer/ — every push to the
+working branch redeploys automatically via GitHub Pages.
+
+**Or run it locally:** open `index.html` in any modern browser (double-click works), or serve it:
 
 ```sh
 python3 -m http.server 8000
