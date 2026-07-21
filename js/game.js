@@ -61,15 +61,15 @@ var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 0.94;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-var SKY_TOP = 0x1f6fd4, SKY_BOT = 0x9fd4f5, FOG_COL = 0xa9d6f0;
+var SKY_TOP = 0x1560c8, SKY_BOT = 0x74b8e6, FOG_COL = 0x7db4dc;
 
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY_BOT);
-scene.fog = new THREE.Fog(FOG_COL, 120, 320);
+scene.fog = new THREE.Fog(FOG_COL, 155, 400);
 
 // gradient sky dome — sells a sunny outdoor sky instead of a flat fill
 (function buildSky() {
@@ -89,8 +89,8 @@ scene.fog = new THREE.Fog(FOG_COL, 120, 320);
   scene.add(sky);
 })();
 
-var camera = new THREE.PerspectiveCamera(68, 1, 0.1, 600);
-camera.position.set(0, 5, 8.2);
+var camera = new THREE.PerspectiveCamera(60, 1, 0.1, 600);
+camera.position.set(0, 6.5, 11.2);
 
 function resize() {
   var w = window.innerWidth, h = window.innerHeight;
@@ -101,9 +101,9 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a40, 0.62));
-scene.add(new THREE.AmbientLight(0xffffff, 0.1));
-var sun = new THREE.DirectionalLight(0xfff2d6, 1.7);
+scene.add(new THREE.HemisphereLight(0xbfe0ff, 0x6a5a40, 0.42));
+scene.add(new THREE.AmbientLight(0xffffff, 0.06));
+var sun = new THREE.DirectionalLight(0xfff0cf, 1.9);
 sun.position.set(22, 46, 20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -135,7 +135,7 @@ function std(c, rough, metal) {
 }
 
 var MAT = {
-  ballast:  lam(0x6b6459),
+  ballast:  lam(0x746a58),
   tie:      lam(0x4a3b2e),
   rail:     std(0xd2d6de, 0.35, 0.85),
   fence:    lam(0x9aa3ad),
@@ -154,7 +154,7 @@ var MAT = {
   leafA:    lam(0x4aa838),
   leafB:    lam(0x358a3a),
   wire:     lam(0x24242a),
-  grass:    lam(0x5ea63c),
+  grass:    lam(0x4fa02f),
   window:   new THREE.MeshBasicMaterial({ color: 0xfff4c2 }),
 };
 
@@ -166,7 +166,7 @@ var trainColors = [
   { body: 0x9a5fd0, trim: 0xffe6ff }, // purple
   { body: 0xccd3de, trim: 0x2f7fe0 }, // silver commuter
 ];
-var bldgColors  = [0xc9a06a, 0x7fa8d0, 0xc98fb0, 0x9cc471, 0xcf7f6a, 0x8a94a3];
+var bldgColors  = [0xb8894f, 0x5f90c4, 0xc06f9a, 0x82b552, 0xc4613f, 0x6f7d8e];
 
 // a coin: gold disc with a raised star face, built once and cloned
 var coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.1, 20);
@@ -185,7 +185,7 @@ var coinStarShape = (function () {
 function makeWindowTexture() {
   var c = document.createElement("canvas"); c.width = 128; c.height = 128;
   var x = c.getContext("2d");
-  x.fillStyle = "#ded6c6"; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = "#c8b89c"; x.fillRect(0, 0, 128, 128);
   var cols = 4, rows = 4, m = 12, gap = 8;
   var wv = (128 - m * 2 - gap * (cols - 1)) / cols;
   for (var i = 0; i < cols; i++) for (var j = 0; j < rows; j++) {
@@ -360,35 +360,69 @@ function buildRunner(opts) {
   g.add(body);
 
   var shirt = lam(opts.shirt), pants = lam(opts.pants), capM = lam(opts.cap);
+  var accent = lam(opts.accent || opts.pack);
+  var hairM  = lam(opts.hair || 0x36271a);
 
-  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.8, 0.42), shirt);
+  // hoodie torso with a collar + drawn hood at the back of the neck
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.82, 0.4), shirt);
   torso.position.y = 1.16; body.add(torso);
+  var hips = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.26, 0.42), accent);
+  hips.position.y = 0.82; body.add(hips);
+  var collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.44), accent);
+  collar.position.y = 1.54; body.add(collar);
+  for (var ss = -1; ss <= 1; ss += 2) {                 // backpack straps over the chest
+    var strap = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.66, 0.06), accent);
+    strap.position.set(ss * 0.2, 1.2, -0.21); body.add(strap);
+  }
 
-  var pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.22), lam(opts.pack));
-  pack.position.set(0, 1.2, 0.3); body.add(pack);
+  // backpack with a pocket
+  var pack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.52, 0.22), lam(opts.pack));
+  pack.position.set(0, 1.22, 0.3); body.add(pack);
+  var pocket = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.09), accent);
+  pocket.position.set(0, 1.1, 0.42); body.add(pocket);
 
-  var head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.44), MAT.skin);
+  // head, hair tuft, hood lump (we mostly see the runner's back)
+  var head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), MAT.skin);
   head.position.y = 1.85; body.add(head);
+  var hair = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.2, 0.3), hairM);
+  hair.position.set(0, 1.72, 0.14); body.add(hair);
+  var hood = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.24), accent);
+  hood.position.set(0, 1.62, 0.2); body.add(hood);
 
-  var capTop = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.16, 0.48), capM);
-  capTop.position.y = 2.11; body.add(capTop);
-  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.26), capM);
-  brim.position.set(0, 2.06, -0.34); body.add(brim);
+  // cap
+  var capTop = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.16, 0.46), capM);
+  capTop.position.y = 2.1; body.add(capTop);
+  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.26), capM);
+  brim.position.set(0, 2.05, -0.34); body.add(brim);
 
-  var armL = limb(0.18, 0.62, 0.18, shirt, -0.47, 1.52, 0); body.add(armL);
-  var armR = limb(0.18, 0.62, 0.18, shirt,  0.47, 1.52, 0); body.add(armR);
-  var legL = limb(0.22, 0.78, 0.22, pants, -0.19, 0.78, 0); body.add(legL);
-  var legR = limb(0.22, 0.78, 0.22, pants,  0.19, 0.78, 0); body.add(legR);
+  // headphones — the classic runner accessory
+  var band = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.13), lam(0x212124));
+  band.position.set(0, 2.14, 0); body.add(band);
+  for (var e = -1; e <= 1; e += 2) {
+    var cup = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.17, 0.17), accent);
+    cup.position.set(e * 0.25, 1.87, 0); body.add(cup);
+  }
 
-  // hands + trainers, parented to the limbs so they swing with the run cycle
-  var shoeMat = lam(opts.shoe || 0xf4f4f4);
+  var armL = limb(0.17, 0.62, 0.17, shirt, -0.42, 1.5, 0); body.add(armL);
+  var armR = limb(0.17, 0.62, 0.17, shirt,  0.42, 1.5, 0); body.add(armR);
+  var legL = limb(0.2, 0.78, 0.22, pants, -0.16, 0.78, 0); body.add(legL);
+  var legR = limb(0.2, 0.78, 0.22, pants,  0.16, 0.78, 0); body.add(legR);
+
+  // hands, and two-tone trainers with a white sole + coloured toe
   [armL, armR].forEach(function (arm) {
-    var hand = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), MAT.skin);
-    hand.position.set(0, -0.66, 0); arm.add(hand);
+    var cuff = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.12, 0.19), accent);
+    cuff.position.set(0, -0.56, 0); arm.add(cuff);
+    var hand = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.2, 0.19), MAT.skin);
+    hand.position.set(0, -0.68, 0); arm.add(hand);
   });
+  var shoeMat = lam(opts.shoe || 0xf4f4f4);
   [legL, legR].forEach(function (leg) {
-    var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.17, 0.42), shoeMat);
-    shoe.position.set(0, -0.82, 0.08); leg.add(shoe);
+    var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.4), shoeMat);
+    shoe.position.set(0, -0.8, 0.08); leg.add(shoe);
+    var sole = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.08, 0.44), lam(0xffffff));
+    sole.position.set(0, -0.88, 0.09); leg.add(sole);
+    var toe = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.11, 0.12), accent);
+    toe.position.set(0, -0.79, 0.26); leg.add(toe);
   });
 
   return { group: g, body: body, armL: armL, armR: armR, legL: legL, legR: legR };
@@ -401,7 +435,8 @@ function animateRun(r, phase, amp) {
   r.legR.rotation.x =  Math.sin(phase) * amp;
 }
 
-var player = buildRunner({ shirt: 0x00b8e6, pants: 0x2d4a8a, cap: 0xe23a3a, pack: 0xe0a92d, shoe: 0xf4f4f4 });
+var player = buildRunner({ shirt: 0x1ec8f0, pants: 0x27407a, cap: 0xe23a3a, pack: 0xef8b1e,
+                           accent: 0xffcf1f, hair: 0x3a2718, shoe: 0xffffff });
 scene.add(shadowify(player.group, true, false));
 
 var blob = new THREE.Mesh(
@@ -415,7 +450,8 @@ board.castShadow = true;
 scene.add(board);
 
 // the inspector + dog, chasing behind
-var guard = buildRunner({ shirt: 0x2a3b66, pants: 0x1c2846, cap: 0x2a3b66, pack: 0x1c2846, shoe: 0x14203a });
+var guard = buildRunner({ shirt: 0x28407a, pants: 0x1c2846, cap: 0x223056, pack: 0x1c2846,
+                          accent: 0xf0c33a, hair: 0x2a2a2a, shoe: 0x14203a });
 scene.add(shadowify(guard.group, true, false));
 var dog = (function () {
   var g = new THREE.Group();
@@ -730,17 +766,43 @@ var sfx = {
   stumble: function () { beep(150, 0.2, "sawtooth", 0.55, 70); },
   crash:   function () { beep(190, 0.45, "sawtooth", 0.7, 35); beep(90, 0.55, "square", 0.5, 30); },
 };
-// two-bar chiptune: bass + kick + hat + a bouncy lead melody
-var BASS = [110, 110, 165, 110, 131, 131, 98, 123];
-var LEAD = [440, 0, 523, 659, 0, 587, 494, 0, 440, 523, 0, 659, 784, 0, 587, 494];
+// eight-bar chiptune: an Am–F–C–G / Am–F–G–E progression with a chord pad,
+// walking bass, a long lead line and a drum groove — ~10s before it repeats
+var PROG = [   // per bar: bass root (Hz) + triad tones for the pad
+  { r: 110.00, pad: [220.0, 261.6, 329.6] },  // Am
+  { r: 87.31,  pad: [174.6, 220.0, 261.6] },  // F
+  { r: 130.81, pad: [196.0, 261.6, 329.6] },  // C
+  { r: 98.00,  pad: [196.0, 246.9, 293.7] },  // G
+  { r: 110.00, pad: [220.0, 261.6, 329.6] },  // Am
+  { r: 87.31,  pad: [174.6, 220.0, 261.6] },  // F
+  { r: 98.00,  pad: [196.0, 246.9, 293.7] },  // G
+  { r: 82.41,  pad: [164.8, 207.7, 246.9] },  // E
+];
+var MEL = [   // 8 bars × 8 steps, 0 = rest
+  659,0,784,880,0,784,659,0,    587,0,698,587,0,523,440,0,
+  523,0,659,784,0,880,784,659,  784,0,880,988,0,880,784,0,
+  659,0,784,880,0,784,659,587,  698,587,0,523,0,440,392,0,
+  587,659,784,880,988,0,880,784, 659,587,0,494,440,0,0,0,
+];
+var BEATPAT = [1, 0, 0, 1, 0, 1, 0, 1];   // bass rhythm within a bar
 function musicTick() {
   var ctx = audio(); if (!ctx || !musicOn || state !== "running") return;
   var t = ctx.currentTime;
-  beep(BASS[musicBeat % 8], 0.18, "triangle", 0.22, null, t);
-  if (musicBeat % 2 === 0) beep(55, 0.12, "sine", 0.5, 38, t);          // kick
-  if (musicBeat % 4 === 2) beep(4200, 0.03, "square", 0.09, null, t);   // hat
-  var lead = LEAD[musicBeat % LEAD.length];
-  if (lead) beep(lead, 0.15, "square", 0.16, null, t);                  // melody
+  var step = musicBeat % 64, sub = step % 8, bar = (step / 8) | 0, chord = PROG[bar];
+
+  if (BEATPAT[sub]) {                                            // bass, with an off-beat fifth
+    beep(sub >= 5 ? chord.r * 1.5 : chord.r, 0.2, "triangle", 0.24, null, t);
+  }
+  if (sub === 0) chord.pad.forEach(function (f) {                // pad swell each bar
+    beep(f, 1.5, "sine", 0.05, null, t);
+  });
+  if (sub === 0 || sub === 4) beep(52, 0.14, "sine", 0.6, 34, t);              // kick
+  if (sub === 4) beep(210, 0.13, "triangle", 0.3, 130, t);                     // snare
+  if (sub % 2 === 1) beep(4400, 0.025, "square", 0.06, null, t);               // hat
+  if (bar === 7 && sub >= 6) beep(300 + sub * 70, 0.08, "square", 0.14, null, t); // end fill
+
+  var lead = MEL[step];
+  if (lead) beep(lead, 0.16, "square", 0.15, null, t);                         // melody
   musicBeat++;
 }
 
@@ -789,7 +851,7 @@ function startGame() {
   elHud.classList.remove("hidden");
   audio();
   if (musicTimer) clearInterval(musicTimer);
-  musicTimer = setInterval(musicTick, 190);
+  musicTimer = setInterval(musicTick, 165);
 }
 
 function endGame(wasCaught) {
@@ -1143,8 +1205,8 @@ function updateVisuals(dt) {
   // blink while invincible
   player.group.visible = invincibleT > 0 ? (Math.floor(performance.now() / 90) % 2 === 0) : true;
 
-  // camera
-  var camY = 4.9 + py * 0.35, camX = px * 0.55;
+  // camera — high and behind, angled down over the runner's shoulder
+  var camY = 6.5 + py * 0.3, camX = px * 0.5;
   if (shakeT > 0) {
     shakeT -= dt;
     camX += (Math.random() - 0.5) * shakeT * 1.2;
@@ -1152,7 +1214,7 @@ function updateVisuals(dt) {
   }
   camera.position.x += (camX - camera.position.x) * Math.min(1, 8 * dt);
   camera.position.y += (camY - camera.position.y) * Math.min(1, 8 * dt);
-  camera.lookAt(px * 0.75, 1.9 + py * 0.4, -12);
+  camera.lookAt(px * 0.6, 1.7 + py * 0.4, -15);
 }
 
 var puLabelCache = "";
