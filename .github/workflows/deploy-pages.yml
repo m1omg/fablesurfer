@@ -1,0 +1,45 @@
+name: Deploy Fable Surfer to GitHub Pages
+
+# Roll out to Pages automatically on every push to the working branch,
+# plus a manual trigger from the Actions tab.
+on:
+  push:
+    branches: [claude/subway-surfers-overview-po5y8y]
+  workflow_dispatch:
+
+# Least-privilege token: read the repo, write the Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One live rollout at a time; a newer push supersedes an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Turns Pages on for the repo if it isn't already (source: Actions).
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # The game is a static site at the repo root — upload it as-is.
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
