@@ -13,11 +13,11 @@
 
   <!-- In-game HUD -->
   <div id="hud" class="hidden">
-    <div id="hud-left">
-      <div id="score-row"><span class="hud-label">SCORE</span><span id="score">0</span></div>
+    <button id="btn-pause" aria-label="Pause"><span></span><span></span></button>
+    <div id="hud-right">
+      <div id="score-row"><span id="mult-row" class="hidden"><span id="mult">×2</span></span><span id="score">0</span></div>
+      <div id="coin-row"><span id="coins">0</span><span id="coin-icon"></span></div>
       <div id="hi-row"><span class="hud-label">BEST</span><span id="hiscore">0</span></div>
-      <div id="coin-row"><span id="coin-icon"></span><span id="coins">0</span></div>
-      <div id="mult-row" class="hidden"><span id="mult">×2</span></div>
     </div>
     <div id="powerups"></div>
     <div id="board-hint">H / double-tap&nbsp;=&nbsp;hoverboard&nbsp;&nbsp;·&nbsp;&nbsp;M&nbsp;=&nbsp;music</div>
@@ -59,6 +59,10 @@
   </div>
 </div>
 <script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/char-textures.js"></script>
+<script src="js/jake-model.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

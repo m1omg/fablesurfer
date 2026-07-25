@@ -1,8 +1,9 @@
 # Fable Surfer 🏃‍♂️🚇
 
 A browser-based endless runner in the spirit of *Subway Surfers* — built with
-Three.js, fully procedural art, and WebAudio-synthesised sound. No build step,
-no external assets, no network required.
+Three.js, procedural low-poly art plus a handful of AI-generated textures
+(embedded as data URIs), and WebAudio-synthesised sound. No build step, no
+external asset requests, no network required.
 
 **▶ Play online:** https://m1omg.github.io/fablesurfer/ — every push to the
 working branch redeploys automatically via GitHub Pages.
@@ -56,9 +57,20 @@ This clone recreates those mechanics with original code, names, and art.
 ## Tech notes
 
 - `index.html` + `style.css` — shell, HUD, menus
-- `js/game.js` — all game logic (~900 lines, plain script, no modules so it
-  runs from `file://`)
+- `js/game.js` — all game logic (plain script, no modules so it runs from
+  `file://`)
+- `js/textures.js` — five AI-generated environment textures (brick, gravel,
+  graffiti, coin face, foliage — GPT Image via the Codex CLI), downscaled,
+  quantized and embedded as data URIs so the game still works offline with
+  zero asset requests. The game degrades to flat-color procedural art if
+  this file is missing.
+- `js/char-textures.js` — three AI-generated character fabric textures
+  (denim, knit, canvas), near-white so they tint to any clothing colour;
+  same embed-as-data-URI approach.
 - `vendor/three.min.js` — Three.js r147 UMD build, vendored so the game works
   offline
-- Art is procedural low-poly (boxes + lambert materials + fog); sounds and the
-  little chiptune loop are synthesised with WebAudio at runtime.
+- Everything else is procedural low-poly (boxes + lambert materials + fog);
+  sounds and the little chiptune loop are synthesised with WebAudio at
+  runtime.
+- `index.html#autostart` skips the menu and exposes `__FS_step(seconds)` for
+  automated screenshots/testing alongside the read-only `__FS` hooks.

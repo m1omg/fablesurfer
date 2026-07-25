@@ -70,21 +70,20 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 function conv(c) { return new THREE.Color(c).convertSRGBToLinear(); }
 
 var scene = new THREE.Scene();
-(function goldenHourSky() {
+(function brightDaySky() {
   var c = document.createElement("canvas"); c.width = 16; c.height = 256;
   var g2 = c.getContext("2d");
   var gr = g2.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0.00, "#1d3c7d");
-  gr.addColorStop(0.42, "#4f7ac4");
-  gr.addColorStop(0.66, "#93b2e0");
-  gr.addColorStop(0.84, "#ffd9a8");
-  gr.addColorStop(1.00, "#ffb877");
+  gr.addColorStop(0.00, "#1e7fe0");
+  gr.addColorStop(0.45, "#45a4ef");
+  gr.addColorStop(0.75, "#8dd0f7");
+  gr.addColorStop(1.00, "#c9ecfb");
   g2.fillStyle = gr; g2.fillRect(0, 0, 16, 256);
   var tex = new THREE.CanvasTexture(c);
   tex.encoding = THREE.sRGBEncoding;
   scene.background = tex;
 })();
-scene.fog = new THREE.Fog(conv(0xffc99a), 45, 140);
+scene.fog = new THREE.Fog(conv(0xa9d7f2), 55, 150);
 
 var camera = new THREE.PerspectiveCamera(68, 1, 0.1, 400);
 camera.position.set(0, 5, 8.2);
@@ -98,9 +97,9 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-scene.add(new THREE.HemisphereLight(conv(0x8fb4e8), conv(0x6b5138), 0.85));
-var sun = new THREE.DirectionalLight(conv(0xffd9a0), 1.35);
-sun.position.set(-30, 27, -26);
+scene.add(new THREE.HemisphereLight(conv(0xbfe0ff), conv(0x8a7a58), 0.95));
+var sun = new THREE.DirectionalLight(conv(0xfff2d8), 1.25);
+sun.position.set(-22, 42, -18);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
@@ -110,17 +109,33 @@ sun.shadow.bias = -0.0004;
 scene.add(sun);
 scene.add(sun.target);
 
-// low evening sun visible down the tracks
-(function sunDisc() {
-  var disc = new THREE.Mesh(new THREE.CircleGeometry(16, 24),
-    new THREE.MeshBasicMaterial({ color: 0xfff3cd, fog: false }));
-  disc.position.set(-30, 30, -300);
-  scene.add(disc);
-  var halo = new THREE.Mesh(new THREE.CircleGeometry(34, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffd9a0, fog: false, transparent: true, opacity: 0.14 }));
-  halo.position.set(-30, 30, -301);
-  scene.add(halo);
-})();
+/* ------------------------------------------------------------------ *
+ *  Generated textures (js/textures.js → window.FS_TEX data URIs).
+ *  Everything degrades to flat colors if the file didn't load.
+ * ------------------------------------------------------------------ */
+var GEN = window.FS_TEX || {};
+function genTex(name, rx, ry) {
+  if (!GEN[name]) return null;
+  var tex = new THREE.TextureLoader().load(GEN[name]);
+  tex.encoding = THREE.sRGBEncoding;
+  if (rx) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(rx, ry || rx);
+  }
+  tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+// load once, share everywhere (clone + own repeat where needed)
+var brickImg = null;                  // <img> for canvas compositing
+if (GEN.brick) { brickImg = new Image(); brickImg.src = GEN.brick; }
+var graffitiImg = null;
+if (GEN.graffiti) { graffitiImg = new Image(); graffitiImg.src = GEN.graffiti; }
+// the HUD coin icon reuses the generated coin face
+if (GEN.coin) {
+  var coinIconEl = $("coin-icon");
+  coinIconEl.style.background = "url(" + GEN.coin + ") center / contain no-repeat";
+  coinIconEl.style.boxShadow = "none";
+}
 
 /* ------------------------------------------------------------------ *
  *  Shared materials / geometries
@@ -129,13 +144,18 @@ function lam(c) { return new THREE.MeshLambertMaterial({ color: conv(c) }); }
 function shade(c, f) { return conv(c).multiplyScalar(f); }
 
 var MAT = {
-  ballast:  lam(0x4a443c),
-  tie:      lam(0x33231a),
-  rail:     lam(0xd8dde6),
-  wall:     lam(0x968e80),
+  ballast:  (function () {
+    var t = genTex("gravel", 6, 56);
+    return t ? new THREE.MeshLambertMaterial({ map: t })
+             : lam(0x9a7a52);
+  })(),
+  tie:      lam(0x8a5a30),
+  rail:     new THREE.MeshPhongMaterial({ color: conv(0xdce4ee),
+              specular: conv(0xbfd8f0), shininess: 60 }),
   hurdleW:  lam(0xe8a72e),
   hurdleS:  lam(0xd8352a),
-  post:     lam(0x555d68),
+  hurdleWhite: lam(0xf2ede4),
+  post:     lam(0x4a5568),
   bar:      lam(0xd8352a),
   coin:     new THREE.MeshPhongMaterial({ color: conv(0xffce2e), emissive: conv(0x7a4c00),
               specular: conv(0xfff2b0), shininess: 90 }),
@@ -143,10 +163,34 @@ var MAT = {
   board:    new THREE.MeshLambertMaterial({ color: conv(0x28e0c0), emissive: conv(0x0a5c4d) }),
 };
 
-var trainColors = [0xc93030, 0x2f6fd0, 0x2f9e50, 0xe0761f, 0x8a4fc9, 0x3a4750];
+// livery palettes in the spirit of the classic subway cars:
+// [body, skirt, stripe, roof]
+var trainLiveries = [
+  { body: 0x5b7fa6, skirt: 0x2c3a4d, stripe: 0xf2ede4, roof: 0xb8c2cc },   // blue-grey metro
+  { body: 0xf2ede8, skirt: 0x3a4750, stripe: 0xe8352a, roof: 0xd8dde2 },   // white express
+  { body: 0x3fae7a, skirt: 0x1f4a38, stripe: 0xffd23f, roof: 0xcdd6d0 },   // teal-green
+  { body: 0xe8b52e, skirt: 0x8a5a10, stripe: 0x2c3e50, roof: 0xd8c9a0 },   // work train
+  { body: 0xd0482e, skirt: 0x5c1f14, stripe: 0xf2ede4, roof: 0xc9b8b0 },   // red liner
+];
 var bldgColors  = [0xb5533c, 0xd9975f, 0x4f8a8b, 0x5a6b8c, 0xcdb98f, 0x8c5a7a];
 
 var coinGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.09, 18);
+
+// hazard-striped surface for train ramps
+var rampMat = (function () {
+  var c = document.createElement("canvas"); c.width = c.height = 64;
+  var g = c.getContext("2d");
+  g.fillStyle = "#e8b52e"; g.fillRect(0, 0, 64, 64);
+  g.strokeStyle = "#3a3f46"; g.lineWidth = 11;
+  for (var i = -64; i < 128; i += 32) {
+    g.beginPath(); g.moveTo(i, 70); g.lineTo(i + 70, -6); g.stroke();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1, 3);
+  return new THREE.MeshLambertMaterial({ map: t });
+})();
 
 /* --- procedural textures ------------------------------------------- */
 // window grids drawn on white so material.color can tint the walls
@@ -160,8 +204,8 @@ var windowTextures = (function () {
       for (var col = 0; col < 4; col++) {
         var x = 10 + col * 30, y = 10 + row * 30;
         var r = Math.random();
-        g.fillStyle = r < 0.22 ? "#ffd9a0" :            // catching the sunset
-                      r < 0.34 ? "#7e94ad" : "#2c3a4d"; // glass
+        g.fillStyle = r < 0.22 ? "#cfe9f8" :            // catching the sky
+                      r < 0.34 ? "#7e94ad" : "#33445c"; // glass
         g.fillRect(x, y, 18, 22);
         g.fillStyle = "rgba(0,0,0,0.25)";
         g.fillRect(x, y + 18, 18, 4);                   // sill shadow
@@ -175,32 +219,69 @@ var windowTextures = (function () {
   return out;
 })();
 
-// colorful (original) graffiti pieces for the trackside walls
-var graffitiTextures = (function () {
-  var out = [], colors = ["#ff4f9a", "#26d07c", "#3fa9ff", "#ffd23f", "#ff7a2e", "#b96bff"];
-  for (var v = 0; v < 3; v++) {
-    var c = document.createElement("canvas"); c.width = 256; c.height = 64;
-    var g = c.getContext("2d");
-    g.fillStyle = "#9a9388"; g.fillRect(0, 0, 256, 64);
-    g.fillStyle = "rgba(0,0,0,0.08)";
-    for (var s = 0; s < 8; s++) g.fillRect(Math.random() * 256, 0, 2, 64);
-    for (var b = 0; b < 5; b++) {
-      var x = 12 + Math.random() * 200, y = 12 + Math.random() * 26;
-      var w = 24 + Math.random() * 46, h = 14 + Math.random() * 22;
-      g.strokeStyle = "#22222e"; g.lineWidth = 5;
-      g.fillStyle = colors[(Math.random() * colors.length) | 0];
-      g.beginPath();
-      g.ellipse(x, y + h / 2, w / 2, h / 2, (Math.random() - 0.5) * 0.5, 0, Math.PI * 2);
-      g.fill(); g.stroke();
-      g.fillStyle = "rgba(255,255,255,0.55)";
-      g.beginPath(); g.ellipse(x - w * 0.15, y + h * 0.3, w * 0.14, h * 0.16, 0, 0, Math.PI * 2); g.fill();
+/* Viaduct wall faces: generated brick composited with arch niches or a
+   graffiti piece. Canvas is drawn immediately with flat colors, then
+   redrawn (needsUpdate) once the generated images finish decoding. */
+function makeWallTexture(variant) {
+  var W = 512, H = 256;
+  var c = document.createElement("canvas"); c.width = W; c.height = H;
+  var g = c.getContext("2d");
+  function draw() {
+    if (brickImg && brickImg.complete && brickImg.naturalWidth) {
+      // brick courses, squashed so bricks read at wall scale
+      for (var y = 0; y < H; y += 128) {
+        g.drawImage(brickImg, 0, y, W, 128);
+        g.drawImage(brickImg, 0, y, W, 128);
+      }
+    } else {
+      g.fillStyle = "#d8703a"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "rgba(0,0,0,0.12)";
+      for (var by = 0; by < H; by += 22) g.fillRect(0, by + 20, W, 2);
     }
-    var tex = new THREE.CanvasTexture(c);
-    tex.encoding = THREE.sRGBEncoding;
-    out.push(tex);
+    if (variant === "arch") {
+      // two rounded-top niches with painted depth
+      for (var i = 0; i < 2; i++) {
+        var cx = W * (0.28 + i * 0.44), aw = W * 0.15, top = H * 0.30, bot = H * 0.995;
+        g.fillStyle = "#7a2f16";
+        g.beginPath();
+        g.moveTo(cx - aw, bot); g.lineTo(cx - aw, top + aw);
+        g.arc(cx, top + aw, aw, Math.PI, 0);
+        g.lineTo(cx + aw, bot); g.closePath(); g.fill();
+        // inner shadow on the left / glow on the right edge
+        g.fillStyle = "rgba(0,0,0,0.30)";
+        g.fillRect(cx - aw, top + aw, aw * 0.35, bot - top - aw);
+        g.fillStyle = "rgba(255,190,140,0.20)";
+        g.fillRect(cx + aw * 0.65, top + aw, aw * 0.35, bot - top - aw);
+        // brick arch ring
+        g.strokeStyle = "#b34a22"; g.lineWidth = 10;
+        g.beginPath(); g.arc(cx, top + aw, aw + 5, Math.PI, 0); g.stroke();
+      }
+    } else if (variant === "graffiti" && graffitiImg && graffitiImg.complete && graffitiImg.naturalWidth) {
+      g.drawImage(graffitiImg, W * 0.06, H * 0.34, W * 0.88, H * 0.60);
+    }
+    // stone coping along the top
+    var grad = g.createLinearGradient(0, 0, 0, H * 0.12);
+    grad.addColorStop(0, "#f2d9b0"); grad.addColorStop(1, "#cfa878");
+    g.fillStyle = grad; g.fillRect(0, 0, W, H * 0.10);
+    g.fillStyle = "rgba(0,0,0,0.22)"; g.fillRect(0, H * 0.10, W, 6);
   }
-  return out;
-})();
+  draw();
+  var tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  var pending = 0;
+  [brickImg, graffitiImg].forEach(function (img) {
+    if (img && !(img.complete && img.naturalWidth)) {
+      pending++;
+      img.addEventListener("load", function () {
+        if (--pending <= 0) { draw(); tex.needsUpdate = true; }
+      });
+    }
+  });
+  return tex;
+}
+var wallTexArch = makeWallTexture("arch");
+var wallTexTag  = makeWallTexture("graffiti");
+var wallTexPlain = makeWallTexture("plain");
 
 /* ------------------------------------------------------------------ *
  *  Static / recycled environment
@@ -212,44 +293,49 @@ var graffitiTextures = (function () {
   slab.position.set(0, -0.15, -130);
   slab.receiveShadow = true;
   scene.add(slab);
-  var side = new THREE.Mesh(new THREE.BoxGeometry(30, 0.28, 320), lam(0x7d7365));
+  var side = new THREE.Mesh(new THREE.BoxGeometry(30, 0.28, 320), lam(0xb08a58));
   side.position.set(-19, -0.16, -130); side.receiveShadow = true; scene.add(side);
   side = side.clone(); side.position.x = 19; scene.add(side);
 
-  // platform safety lines
-  for (var s = -1; s <= 1; s += 2) {
-    var line = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 320), lam(0xe8c93f));
-    line.position.set(s * 5.2, 0.02, -130);
-    scene.add(line);
-  }
-
   for (var l = 0; l < 3; l++) {
     for (var s2 = -1; s2 <= 1; s2 += 2) {
-      var rail = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.12, 320), MAT.rail);
-      rail.position.set(LANE_X[l] + s2 * 0.72, 0.06, -130);
+      var rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 320), MAT.rail);
+      rail.position.set(LANE_X[l] + s2 * 0.72, 0.07, -130);
       scene.add(rail);
     }
   }
-  // warm evening clouds
-  for (var i = 0; i < 7; i++) {
-    var cl = new THREE.Mesh(new THREE.BoxGeometry(9 + Math.random() * 10, 1.4, 3),
-      new THREE.MeshBasicMaterial({ color: 0xffe2c4, fog: false, transparent: true, opacity: 0.45 }));
-    cl.position.set(-70 + Math.random() * 140, 42 + Math.random() * 20, -200 - Math.random() * 60);
+  // overhead catenary wires, one pair per lane (uniform along z → static).
+  // kept well above the camera (y≈5-6) so they project as thin lines
+  var wireMat = new THREE.MeshBasicMaterial({ color: 0x20242c });
+  for (l = 0; l < 3; l++) {
+    var wire = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 320), wireMat);
+    wire.position.set(LANE_X[l], 6.6, -130);
+    scene.add(wire);
+    var wire2 = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.022, 320), wireMat);
+    wire2.position.set(LANE_X[l], 7.1, -130);
+    scene.add(wire2);
+  }
+  // puffy white clouds
+  for (var i = 0; i < 8; i++) {
+    var cl = new THREE.Mesh(new THREE.BoxGeometry(9 + Math.random() * 10, 1.8, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, transparent: true, opacity: 0.85 }));
+    cl.position.set(-80 + Math.random() * 160, 40 + Math.random() * 24, -200 - Math.random() * 60);
     scene.add(cl);
   }
-  // distant skyline silhhouettes, mostly swallowed by the haze
+  // distant skyline silhouettes, mostly swallowed by the haze
   for (i = 0; i < 16; i++) {
     var hgt = 18 + Math.random() * 34;
-    var far = new THREE.Mesh(new THREE.BoxGeometry(10 + Math.random() * 14, hgt, 10), lam(0x5a6b8c));
+    var far = new THREE.Mesh(new THREE.BoxGeometry(10 + Math.random() * 14, hgt, 10),
+      lam(bldgColors[(Math.random() * bldgColors.length) | 0]));
     var sd = Math.random() < 0.5 ? -1 : 1;
-    far.position.set(sd * (34 + Math.random() * 40), hgt / 2, -90 - Math.random() * 90);
+    far.position.set(sd * (36 + Math.random() * 40), hgt / 2, -100 - Math.random() * 80);
     scene.add(far);
   }
 })();
 
 var ties = [];
 (function buildTies() {
-  var g = new THREE.BoxGeometry(10.6, 0.1, 0.55);
+  var g = new THREE.BoxGeometry(10.6, 0.12, 0.62);
   for (var i = 0; i < 90; i++) {
     var t = new THREE.Mesh(g, MAT.tie);
     t.position.set(0, 0.01, 14 - i * 2.4);
@@ -258,20 +344,74 @@ var ties = [];
   }
 })();
 
-// trackside concrete walls, some tagged with graffiti
+// tall brick viaduct walls boxing in the tracks, greenery peeking over
 var fences = [];
-(function buildFences() {
-  var g = new THREE.BoxGeometry(0.35, 2.1, 11);
+(function buildWalls() {
+  var wallGeo = new THREE.BoxGeometry(0.7, 6.4, 12);
+  var leafTex = genTex("leaves", 2, 1);
+  var leafMats = [0x3fae3a, 0x2f9e50, 0x57c23a].map(function (col) {
+    return leafTex
+      ? new THREE.MeshLambertMaterial({ map: leafTex, color: conv(col) })
+      : lam(col);
+  });
+  var trunkMat = lam(0x6b4a26);
+  var wallMats = [
+    new THREE.MeshLambertMaterial({ map: wallTexArch }),
+    new THREE.MeshLambertMaterial({ map: wallTexPlain }),
+    new THREE.MeshLambertMaterial({ map: wallTexTag }),
+  ];
   for (var i = 0; i < 22; i++) {
     for (var s = -1; s <= 1; s += 2) {
-      var mat = (i + (s > 0 ? 1 : 0)) % 3 === 0
-        ? new THREE.MeshLambertMaterial({ map: graffitiTextures[(Math.random() * 3) | 0] })
-        : MAT.wall;
-      var f = new THREE.Mesh(g, mat);
-      f.position.set(s * 6.4, 1.05, 16 - i * 12);
+      var mod = new THREE.Group();
+      var pickWall = (i + (s > 0 ? 1 : 0)) % 3;
+      var f = new THREE.Mesh(wallGeo, wallMats[pickWall]);
+      f.position.set(0, 3.2, 0);
       f.receiveShadow = true;
       f.castShadow = true;
-      scene.add(f); fences.push(f);
+      mod.add(f);
+
+      // tree clumps above the coping
+      var nTrees = 1 + ((i + s) & 1);
+      for (var t = 0; t < nTrees; t++) {
+        var tz = -4 + t * 5 + Math.random() * 3;
+        var r = 1.6 + Math.random() * 1.3;
+        var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 1.6, 6), trunkMat);
+        trunk.position.set(Math.random() * 1.2 * (s > 0 ? 1 : -1), 6.8, tz);
+        mod.add(trunk);
+        var crown = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8),
+          leafMats[(Math.random() * leafMats.length) | 0]);
+        crown.scale.y = 0.85;
+        crown.position.set(trunk.position.x, 7.6 + r * 0.7, tz);
+        crown.castShadow = true;
+        mod.add(crown);
+      }
+
+      // catenary mast on every other module, signal on some
+      if (i % 2 === 0) {
+        var mast = new THREE.Mesh(new THREE.BoxGeometry(0.16, 7.2, 0.16), MAT.post);
+        mast.position.set(s * -1.35, 3.6, 2.5);           // just inside the wall
+        mast.castShadow = true;
+        mod.add(mast);
+        var arm = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.1), MAT.post);
+        arm.position.set(s * -2.1, 6.85, 2.5);
+        mod.add(arm);
+        if (i % 8 === 0) {                                 // red signal box
+          var sig = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.24), lam(0xd8352a));
+          sig.position.set(s * -1.35, 3.4, 2.32);
+          mod.add(sig);
+          var lampG = new THREE.Mesh(new THREE.CircleGeometry(0.11, 10),
+            new THREE.MeshBasicMaterial({ color: 0x3fd45c }));
+          lampG.position.set(s * -1.35, 3.62, 2.45);       // faces the camera
+          mod.add(lampG);
+          var lampR = new THREE.Mesh(new THREE.CircleGeometry(0.11, 10),
+            new THREE.MeshBasicMaterial({ color: 0x8a2018 }));
+          lampR.position.set(s * -1.35, 3.24, 2.45);
+          mod.add(lampR);
+        }
+      }
+
+      mod.position.set(s * 7.0, 0, 16 - i * 12);
+      scene.add(mod); fences.push(mod);
     }
   }
 })();
@@ -304,75 +444,208 @@ function styleBuilding(b) {
  * ------------------------------------------------------------------ */
 var LEAN = 0.14;   // forward sprint lean of the torso group
 
+// subtle woven-cloth texture so big clothing surfaces don't read as plastic
+var fabricTexture = (function () {
+  var c = document.createElement("canvas"); c.width = c.height = 64;
+  var g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, 64, 64);
+  for (var i = 0; i < 1200; i++) {
+    g.fillStyle = Math.random() < 0.5 ? "rgba(20,20,60,0.06)" : "rgba(255,255,255,0.07)";
+    g.fillRect((Math.random() * 64) | 0, (Math.random() * 64) | 0, 2, 1);
+  }
+  for (i = 0; i < 64; i += 4) {                        // faint weave rows
+    g.fillStyle = "rgba(0,0,50,0.03)";
+    g.fillRect(0, i, 64, 1);
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+})();
+// generated tintable cloth textures (GPT Image, near-white so material.color
+// tints them); fall back to the procedural weave when a file is absent
+var clothTex = {
+  denim:  genTex("denim", 2, 2)  || fabricTexture,
+  knit:   genTex("knit", 3, 3)   || fabricTexture,
+  canvas: genTex("canvas", 2, 2) || fabricTexture,
+};
+function fabric(c, kind) {
+  var map = (kind && clothTex[kind]) || fabricTexture;
+  return new THREE.MeshLambertMaterial({ color: conv(c), map: map });
+}
+
 function buildRunner(opts) {
   var body = new THREE.Group();           // rotates for the somersault / lean
   var g = new THREE.Group();              // world placement
   g.add(body);
   body.rotation.x = LEAN;
 
-  var shirt = lam(opts.shirt), pants = lam(opts.pants),
-      shoes = lam(opts.shoes), capM = lam(opts.cap);
+  var shirt = fabric(opts.shirt, "denim"), pants = fabric(opts.pants, "denim"),
+      shoes = lam(opts.shoes), capM = fabric(opts.cap, "canvas");
+  var sleeves = opts.sleeves ? fabric(opts.sleeves, "knit") : shirt;
   var beefy = opts.beefy ? 1.18 : 1;
 
-  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * beefy, 0.37 * beefy, 0.74, 10), shirt);
-  torso.position.y = 1.14; body.add(torso);
-  var hips = new THREE.Mesh(new THREE.BoxGeometry(0.44 * beefy, 0.2, 0.32), pants);
-  hips.position.y = 0.74; body.add(hips);
-  // hood resting on the shoulders
-  var hood = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), shirt);
-  hood.scale.set(1, 0.55, 0.9);
-  hood.position.set(0, 1.56, 0.12); body.add(hood);
+  /* --- one chunky torso volume the limbs tuck into --- */
+  var torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.31 * beefy, 0.3, 12, 32), shirt);
+  torso.scale.set(1.06, 1, 0.9);
+  torso.position.y = 1.18; body.add(torso);
+  // hoodie hem peeking out under the vest
+  var hem = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * beefy, 0.32 * beefy, 0.12, 32), sleeves);
+  hem.position.y = 0.86; body.add(hem);
+  var pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.27 * beefy, 32, 22), pants);
+  pelvis.scale.set(1.05, 0.75, 0.85);
+  pelvis.position.y = 0.78; body.add(pelvis);
+  var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.24, 24), MAT.skin);
+  neck.position.y = 1.72; body.add(neck);
 
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 12), MAT.skin);
-  head.position.y = 1.88; body.add(head);
-  var capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.275, 0.14, 12), capM);
-  capTop.position.y = 2.06; body.add(capTop);
-  var dome = new THREE.Mesh(new THREE.SphereGeometry(0.265, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), capM);
-  dome.position.y = 2.1; body.add(dome);
-  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.3), capM);
-  brim.position.set(0, 2.02, opts.brimForward ? -0.36 : 0.36);   // backwards cap for the surfer
-  body.add(brim);
-
-  if (opts.pack) {
-    var pack = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.52, 0.2), lam(opts.pack));
-    pack.position.set(0, 1.22, 0.32); body.add(pack);
-    for (var s = -1; s <= 1; s += 2) {                            // spray cans poking out
-      var can = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.2, 8),
-        lam(s < 0 ? 0xff4f9a : 0x26d07c));
-      can.position.set(s * 0.12, 1.55, 0.32); body.add(can);
+  if (opts.sleeves) {
+    // vest front: zipper, chest pockets, hood drawstrings
+    var zipper = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.52, 0.03), lam(0xd8dde6));
+    zipper.position.set(0, 1.22, -0.3 * beefy); body.add(zipper);
+    for (var pS = -1; pS <= 1; pS += 2) {
+      var pocket = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.11, 0.03), lam(opts.shirt));
+      pocket.position.set(pS * 0.17, 1.34, -0.295 * beefy);
+      body.add(pocket);
+      var pocketFlap = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.03, 0.035),
+        new THREE.MeshLambertMaterial({ color: shade(opts.shirt, 0.7) }));
+      pocketFlap.position.set(pS * 0.17, 1.4, -0.3 * beefy);
+      body.add(pocketFlap);
+      var cord = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.17, 10), lam(0xf2ede4));
+      cord.position.set(pS * 0.09, 1.5, -0.3 * beefy);
+      cord.rotation.z = pS * 0.15;
+      body.add(cord);
     }
   }
+
+  // rounded shoulder yoke sealing torso, arms and hood together
+  var chest = new THREE.Mesh(new THREE.SphereGeometry(0.31 * beefy, 32, 22), shirt);
+  chest.scale.set(1.06, 0.6, 0.9);
+  chest.position.y = 1.6; body.add(chest);
+  // hood bunched over the shoulders and upper back
+  var hood = new THREE.Mesh(new THREE.SphereGeometry(0.3, 32, 22),
+    opts.hood ? fabric(opts.hood, "knit") : shirt);
+  hood.scale.set(1.2, 0.58, 1);
+  hood.position.set(0, 1.68, 0.2 * beefy); body.add(hood);
+
+  if (opts.bandana) {
+    var scarf = new THREE.Mesh(new THREE.CylinderGeometry(0.185, 0.225, 0.17, 28), fabric(opts.bandana, "knit"));
+    scarf.position.y = 1.82; body.add(scarf);
+    var knot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), lam(opts.bandana));
+    knot.position.set(0.1, 1.74, 0.2); body.add(knot);
+  }
+
+  /* --- big head with an actual face (they run toward -z) --- */
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 40, 30), MAT.skin);
+  head.scale.set(1, 0.95, 0.98);
+  head.position.y = 2.12; body.add(head);
+
+  var eyeM = lam(0x2a2620);
+  for (var eS = -1; eS <= 1; eS += 2) {
+    var eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 20, 16), eyeM);
+    eye.scale.set(0.8, 1.25, 0.55);
+    eye.position.set(eS * 0.135, 2.14, -0.33); body.add(eye);
+    var glint = new THREE.Mesh(new THREE.SphereGeometry(0.028, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    glint.position.set(eS * 0.105, 2.19, -0.375); body.add(glint);
+    var brow = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 0.05),
+      lam(opts.brow || opts.hair || 0x5c4630));
+    brow.position.set(eS * 0.14, 2.29, -0.315);
+    brow.rotation.z = eS * (opts.angry ? 0.35 : -0.12);   // angry brows tilt inward
+    body.add(brow);
+  }
+  var nose = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), lam(0xdfa06f));
+  nose.position.set(0, 2.06, -0.365); body.add(nose);
+  if (opts.mustache) {
+    var mo = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.1, 0.07), lam(0xd8d4cc));
+    mo.position.set(0, 1.98, -0.33); body.add(mo);
+  } else {
+    var mouth = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 12), lam(0x8a4a3a));
+    mouth.scale.set(1.5, 0.7, 0.4);
+    mouth.position.set(0, 1.96, -0.325); body.add(mouth);
+  }
+  for (var cS = -1; cS <= 1; cS += 2) {                   // ears
+    var ear = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), MAT.skin);
+    ear.scale.set(0.5, 0.8, 0.7);
+    ear.position.set(cS * 0.355, 2.08, -0.02); body.add(ear);
+  }
+
+  if (opts.hair) {
+    var hairM = lam(opts.hair);
+    var fringe = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.13, 0.12), hairM);
+    fringe.position.set(0, 2.32, -0.29); body.add(fringe);
+    for (var hS = -1; hS <= 1; hS += 2) {
+      var tuft = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.2, 0.26), hairM);
+      tuft.position.set(hS * 0.32, 2.2, -0.05); body.add(tuft);
+    }
+  }
+
+  /* --- cap sitting on the bigger head --- */
+  var capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.365, 0.375, 0.15, 32), capM);
+  capTop.position.y = 2.38; body.add(capTop);
+  var dome = new THREE.Mesh(new THREE.SphereGeometry(0.365, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2), capM);
+  dome.position.y = 2.42; body.add(dome);
+  var brim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.34),
+    opts.brimColor ? lam(opts.brimColor) : capM);
+  brim.position.set(0, 2.34, opts.brimForward ? -0.5 : 0.5);   // backwards cap for the surfer
+  body.add(brim);
+  var button = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12),
+    opts.brimColor ? lam(opts.brimColor) : capM);
+  button.position.y = 2.6; body.add(button);
+  if (opts.brimColor && opts.brimForward) {
+    // colored rear panel so the forward-worn cap pops from behind too
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.05), lam(opts.brimColor));
+    panel.position.set(0, 2.37, 0.35); body.add(panel);
+  }
+
   if (opts.badge) {
-    var badge = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.11, 0.03), lam(0xe8c93f));
-    badge.position.set(-0.15, 1.32, -0.35 * beefy); body.add(badge);
+    var badge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.03), lam(0xe8c93f));
+    badge.position.set(-0.17, 1.44, -0.33 * beefy); body.add(badge);
   }
 
   function armAt(sx) {
     var arm = new THREE.Group();
-    arm.position.set(sx * 0.44 * beefy, 1.46, 0);
-    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.3, 4, 8), shirt);
-    upper.position.y = -0.19; arm.add(upper);
-    var fore = new THREE.Group(); fore.position.y = -0.38;
+    arm.position.set(sx * 0.38 * beefy, 1.54, 0);   // tucked into the shoulder yoke
+    var shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.15, 24, 16), sleeves);
+    arm.add(shoulder);
+    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.22, 12, 24), sleeves);
+    upper.position.y = -0.17; arm.add(upper);
+    var elbow = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), sleeves);
+    elbow.position.y = -0.34; arm.add(elbow);
+    var fore = new THREE.Group(); fore.position.y = -0.34;
     fore.rotation.x = -0.85;                                      // pumping elbows
-    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.24, 4, 8), shirt);
-    lower.position.y = -0.15; fore.add(lower);
-    var hand = new THREE.Mesh(new THREE.SphereGeometry(0.085, 8, 6), MAT.skin);
-    hand.position.y = -0.32; fore.add(hand);
+    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.18, 12, 24), sleeves);
+    lower.position.y = -0.13; fore.add(lower);
+    var hand = new THREE.Mesh(new THREE.SphereGeometry(0.125, 24, 16), MAT.skin);
+    hand.scale.set(1, 0.9, 1.1);                                  // mitt hands
+    hand.position.y = -0.29; fore.add(hand);
     arm.add(fore);
-    arm.rotation.z = sx * -0.12;
+    arm.rotation.z = sx * -0.2;
     body.add(arm);
     return arm;
   }
   function legAt(sx) {
     var thigh = new THREE.Group();
-    thigh.position.set(sx * 0.16, 0.8, 0);
-    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.28, 4, 8), pants);
-    upper.position.y = -0.18; thigh.add(upper);
+    thigh.position.set(sx * 0.17, 0.84, 0);
+    var hip = new THREE.Mesh(new THREE.SphereGeometry(0.145, 24, 16), pants);
+    thigh.add(hip);
+    var upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.135, 0.24, 12, 24), pants);
+    upper.position.y = -0.2; thigh.add(upper);
+    var knee = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 14), pants);
+    knee.position.y = -0.4; thigh.add(knee);
     var shin = new THREE.Group(); shin.position.y = -0.4;
-    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.24, 4, 8), pants);
+    var lower = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.2, 12, 24), pants);
     lower.position.y = -0.15; shin.add(lower);
-    var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.11, 0.3), shoes);
-    shoe.position.set(0, -0.33, -0.05); shin.add(shoe);
+    // chunky sneaker: body + rounded toe + sole stripe + heel patch
+    var shoe = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.13, 0.36), shoes);
+    shoe.position.set(0, -0.38, -0.06); shin.add(shoe);
+    var toe = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 14), shoes);
+    toe.scale.set(0.9, 0.72, 0.9);
+    toe.position.set(0, -0.39, -0.24); shin.add(toe);
+    if (opts.shoeAccent) {
+      var wrap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.38), lam(opts.shoeAccent));
+      wrap.position.set(0, -0.415, -0.06); shin.add(wrap);
+      var heel = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.06), lam(opts.shoeHeel || 0xd8352a));
+      heel.position.set(0, -0.37, 0.11); shin.add(heel);
+    }
     thigh.add(shin);
     body.add(thigh);
     return { thigh: thigh, shin: shin };
@@ -388,30 +661,126 @@ function buildRunner(opts) {
            thighR: legR.thigh, shinR: legR.shin };
 }
 
-function animateRun(r, phase, amp) {
-  var s = Math.sin(phase);
-  r.armL.rotation.x = -s * amp * 0.9;
-  r.armR.rotation.x =  s * amp * 0.9;
-  r.thighL.rotation.x =  s * amp;
-  r.thighR.rotation.x = -s * amp;
-  // knees bend as each leg swings through recovery
-  r.shinL.rotation.x = -Math.max(0, Math.sin(phase + 2.2)) * amp * 1.15;
-  r.shinR.rotation.x = -Math.max(0, Math.sin(phase + 2.2 + Math.PI)) * amp * 1.15;
-  r.body.position.y = Math.abs(Math.cos(phase)) * 0.05;
+/* Frame-rate-independent exponential smoothing toward a target. Higher
+   lambda = snappier; used both to track the run cycle and to melt the
+   snap when the pose switches between run / jump / roll states. */
+function damp(cur, tgt, dt, lambda) {
+  return tgt + (cur - tgt) * Math.exp(-lambda * dt);
 }
 
-function poseAirborne(r) {
-  r.thighL.rotation.x = 1.2;  r.shinL.rotation.x = -1.9;   // lead knee tucked
-  r.thighR.rotation.x = -0.3; r.shinR.rotation.x = -0.5;
-  r.armL.rotation.x = 2.4;    r.armR.rotation.x = 2.1;     // arms flung up
-  r.body.position.y = 0;
+/* Drives one runner's six joints (+ torso bob / twist) toward a target
+   pose for the given mode, then damps the actual rotations toward it so
+   every transition is a smooth blend instead of a hard snap.
+   modes: "run" (phase/amp drive a gait), "air" (leap tuck), "tuck" (roll
+   ball — caller owns the body somersault). */
+function poseRunner(r, dt, mode, phase, amp) {
+  var aL = 0, aR = 0, tL = 0, tR = 0, sL = 0, sR = 0;
+  var bobY = null, twist = 0, rollZ = 0;
+
+  if (mode === "air") {
+    aL = 2.4; aR = 2.1;                         // arms flung up
+    tL = 1.2; tR = -0.3;                        // lead knee tucked
+    sL = -1.9; sR = -0.5;
+    bobY = 0;
+  } else if (mode === "tuck") {
+    aL = aR = 2.5;                              // curl into a ball
+    tL = tR = 1.95;
+    sL = sR = -2.5;
+  } else {                                      // run
+    var s = Math.sin(phase), c = Math.cos(phase);
+    aL = -s * amp * 0.95; aR = s * amp * 0.95;
+    tL =  s * amp;        tR = -s * amp;
+    // knee bend peaks during recovery; squared so it's smooth (C1) at the
+    // zero-crossing instead of the kink a max(0,sin) produces
+    var bL = Math.max(0, Math.sin(phase + 2.2));
+    var bR = Math.max(0, Math.sin(phase + 2.2 + Math.PI));
+    sL = -bL * bL * amp * 1.7;
+    sR = -bR * bR * amp * 1.7;
+    bobY  = Math.abs(c) * 0.055 * amp;          // vertical bob each stride
+    twist = c * 0.07 * amp;                     // spine counter-twist to the arms
+    rollZ = s * 0.035 * amp;                    // subtle shoulder roll
+  }
+
+  var L = 26;
+  r.armL.rotation.x   = damp(r.armL.rotation.x,   aL, dt, L);
+  r.armR.rotation.x   = damp(r.armR.rotation.x,   aR, dt, L);
+  r.thighL.rotation.x = damp(r.thighL.rotation.x, tL, dt, L);
+  r.thighR.rotation.x = damp(r.thighR.rotation.x, tR, dt, L);
+  r.shinL.rotation.x  = damp(r.shinL.rotation.x,  sL, dt, L);
+  r.shinR.rotation.x  = damp(r.shinR.rotation.x,  sR, dt, L);
+  // twist/roll damp toward 0 outside run mode — safe during a roll, which
+  // drives body.rotation.x (a different axis)
+  r.body.rotation.y = damp(r.body.rotation.y, twist, dt, L);
+  r.body.rotation.z = damp(r.body.rotation.z, rollZ, dt, L);
+  if (bobY !== null) r.body.position.y = damp(r.body.position.y, bobY, dt, 30);
 }
 
 var player = buildRunner({
-  shirt: 0x00a8d8, pants: 0x35508f, shoes: 0xf2f2f2,
-  cap: 0xe23a3a, pack: 0xe0a92d, brimForward: false,
+  shirt: 0x5f8ad0,                       // denim vest torso…
+  sleeves: 0xf2ead8, hood: 0xd9cbaa,     // …over a cream hoodie
+  pants: 0x7d99cf,                       // washed-denim jeans
+  shoes: 0xf2ede0, shoeAccent: 0x49b82e, shoeHeel: 0xd8352a,
+  cap: 0xf2ede4, brimColor: 0xd8352a, brimForward: true,
+  hair: 0x6b4226, bandana: 0xd8352a,
 });
 scene.add(player.group);
+
+/* ------------------------------------------------------------------ *
+ *  Jake — the rigged Rodin GLB with a baked "Run" cycle, overlaid on the
+ *  procedural runner. The primitive body stays in the scene for hitboxes
+ *  and physics but is hidden; this skinned mesh mirrors its world
+ *  placement and plays the Run clip through an AnimationMixer. Degrades
+ *  gracefully: if the loader or the model file is missing, the procedural
+ *  runner simply stays visible and nothing else changes.
+ * ------------------------------------------------------------------ */
+var jake = { root: null, mixer: null, action: null, ready: false, baseScale: 1.7 };
+(function loadJake() {
+  if (typeof THREE.GLTFLoader !== "function" || !window.FS_JAKE_GLB) return;
+  new THREE.GLTFLoader().load(window.FS_JAKE_GLB, function (gltf) {
+    var root = gltf.scene;
+    root.scale.setScalar(jake.baseScale);
+    root.rotation.y = Math.PI;                  // face -z, into the run
+    root.traverse(function (o) {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.frustumCulled = false;                // skinned bounds are unreliable
+      }
+    });
+    scene.add(root);
+    jake.root = root;
+    jake.mixer = new THREE.AnimationMixer(root);
+    if (gltf.animations && gltf.animations.length) {
+      jake.action = jake.mixer.clipAction(gltf.animations[0]);
+      jake.action.play();
+    }
+    player.body.visible = false;                // retire the primitive puppet
+    jake.ready = true;
+  }, undefined, function (err) {
+    console.warn("[FS] Jake model failed to load; keeping procedural runner", err);
+  });
+})();
+
+// mirror the hidden runner's placement onto Jake and advance his Run cycle
+function syncJake(dt) {
+  if (!jake.ready) return;
+  var root = jake.root;
+  var tempo = state === "menu" ? 1.0 : Math.max(0.55, Math.min(2.4, speed / BASE_SPEED));
+  jake.mixer.update(dt * tempo);
+  root.position.copy(player.group.position);
+
+  if (state === "dying" || state === "over") {
+    root.rotation.x = Math.min(root.rotation.x + 4 * dt, 1.4);   // tip forward
+    root.scale.setScalar(jake.baseScale);
+  } else if (rollT > 0) {
+    root.rotation.x = 0;
+    root.scale.set(jake.baseScale, jake.baseScale * 0.55, jake.baseScale);
+    root.position.y -= 0.35;                     // sink into the tuck
+  } else {
+    root.rotation.x = 0;
+    root.scale.setScalar(jake.baseScale);
+  }
+  root.visible = invincibleT > 0 ? (Math.floor(performance.now() / 90) % 2 === 0) : true;
+}
 
 var board = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.12, 1.5), MAT.board);
 board.visible = false;
@@ -420,14 +789,15 @@ scene.add(board);
 
 // the inspector + dog, chasing behind
 var guard = buildRunner({
-  shirt: 0x2b3a63, pants: 0x1f2a47, shoes: 0x22252a,
-  cap: 0x2b3a63, brimForward: true, beefy: true, badge: true,
+  shirt: 0xb09a72, pants: 0x8a744e, shoes: 0x2c2418,
+  cap: 0xb09a72, brimForward: true, beefy: true, badge: true, mustache: true,
+  angry: true, brow: 0x8a8078,
 });
 scene.add(guard.group);
 
 var dog = (function () {
   var g = new THREE.Group();
-  var fur = lam(0x8a6034), dark = lam(0x5c3f20);
+  var fur = lam(0xe8e0d0), dark = lam(0x8a8078);
   var b = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.5, 4, 8), fur);
   b.rotation.x = Math.PI / 2; b.position.y = 0.42; g.add(b);
   var h = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), fur);
@@ -459,57 +829,90 @@ var dog = (function () {
 var obstacles = [], coins = [], powerups = [];
 
 function makeTrain(lane, z, len, opts) {
-  var color = trainColors[(Math.random() * trainColors.length) | 0];
+  var liv = trainLiveries[(Math.random() * trainLiveries.length) | 0];
   var g = new THREE.Group();
   var bodyLen = opts.ramp ? len - RAMP_LEN : len;
-  var bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, TRAIN_H, bodyLen), lam(color));
-  bodyMesh.position.set(0, TRAIN_H / 2, opts.ramp ? -RAMP_LEN / 2 : 0);
+  var zC = opts.ramp ? -RAMP_LEN / 2 : 0;
+  var bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, TRAIN_H, bodyLen), lam(liv.body));
+  bodyMesh.position.set(0, TRAIN_H / 2, zC);
   bodyMesh.castShadow = bodyMesh.receiveShadow = true;
   g.add(bodyMesh);
-  var roof = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.16, 0.14, bodyLen - 0.2), lam(0xb8bdc4));
-  roof.position.set(0, TRAIN_H + 0.07, bodyMesh.position.z);
+  // flat walkable roof with rounded shoulder trims
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.16, 0.14, bodyLen - 0.2), lam(liv.roof));
+  roof.position.set(0, TRAIN_H + 0.07, zC);
   roof.receiveShadow = true;
   g.add(roof);
-  // dark under-skirt grounds the car visually
+  var trimGeo = new THREE.CylinderGeometry(0.11, 0.11, bodyLen - 0.2, 8);
+  for (var sT = -1; sT <= 1; sT += 2) {
+    var trim = new THREE.Mesh(trimGeo, lam(liv.roof));
+    trim.rotation.x = Math.PI / 2;
+    trim.position.set(sT * (TRAIN_W - 0.1), TRAIN_H + 0.02, zC);
+    g.add(trim);
+  }
+  // roof vents
+  var nV = Math.max(1, Math.round(bodyLen / 6));
+  for (var v = 0; v < nV; v++) {
+    var vent = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 1.1), lam(0x9aa4ac));
+    vent.position.set(0, TRAIN_H + 0.2,
+      zC - bodyLen / 2 + (v + 0.5) * (bodyLen / nV));
+    g.add(vent);
+  }
+  // dark under-skirt with wheel bogies
   var skirt = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.06, 0.5, bodyLen - 0.3),
     lam(0x23262b));
-  skirt.position.set(0, 0.25, bodyMesh.position.z);
+  skirt.position.set(0, 0.25, zC);
   g.add(skirt);
-  // white livery stripe
-  var stripe = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.05, 0.24, bodyLen - 0.4),
-    lam(0xf2ede4));
-  stripe.position.set(0, 1.05, bodyMesh.position.z);
+  // livery stripe
+  var stripe = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.05, 0.26, bodyLen - 0.4),
+    lam(liv.stripe));
+  stripe.position.set(0, 1.02, zC);
   g.add(stripe);
-  // window band, tinted by the sunset
+  // window band with a cool sky reflection
   var win = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 + 0.04, 0.55, bodyLen - 1),
-    new THREE.MeshLambertMaterial({ color: conv(0x2c3e50), emissive: conv(0x8a5a30),
-      emissiveIntensity: 0.25 }));
-  win.position.set(0, TRAIN_H * 0.66, bodyMesh.position.z);
+    new THREE.MeshLambertMaterial({ color: conv(0x24313e), emissive: conv(0x4a7a9e),
+      emissiveIntensity: 0.28 }));
+  win.position.set(0, TRAIN_H * 0.66, zC);
   g.add(win);
   // sliding doors
-  var doorMat = new THREE.MeshLambertMaterial({ color: shade(color, 0.62) });
+  var doorMat = new THREE.MeshLambertMaterial({ color: shade(liv.body, 0.62) });
   var nDoors = Math.max(1, Math.round(bodyLen / 7));
   for (var d = 0; d < nDoors; d++) {
     for (var sSign = -1; sSign <= 1; sSign += 2) {
       var door = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.7, 1.1), doorMat);
       door.position.set(sSign * (TRAIN_W + 0.02), 1.15,
-        bodyMesh.position.z - bodyLen / 2 + (d + 0.5) * (bodyLen / nDoors));
+        zC - bodyLen / 2 + (d + 0.5) * (bodyLen / nDoors));
       g.add(door);
     }
   }
   if (opts.ramp) {
     // sloped tail the runner can sprint up
-    var ramp = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, 0.25, Math.hypot(RAMP_LEN, TRAIN_H) + 0.4), lam(0x777d85));
+    var ramp = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2, 0.25, Math.hypot(RAMP_LEN, TRAIN_H) + 0.4), rampMat);
     ramp.position.set(0, TRAIN_H / 2, len / 2 - RAMP_LEN / 2);
     ramp.rotation.x = Math.atan2(TRAIN_H, RAMP_LEN);
     ramp.castShadow = ramp.receiveShadow = true;
     g.add(ramp);
-  }
-  if (opts.moving) {
-    var lightMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.15),
-      new THREE.MeshBasicMaterial({ color: 0xfff3a0 }));
-    lightMesh.position.set(0, 1.1, len / 2 + 0.05);
-    g.add(lightMesh);
+  } else {
+    // cab face toward the player: windshield, yellow nose panel, headlights
+    var frontZ = zC + bodyLen / 2;
+    var face = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.08, TRAIN_H - 0.3, 0.1),
+      lam(liv.stripe));
+    face.position.set(0, TRAIN_H / 2 + 0.05, frontZ + 0.03);
+    g.add(face);
+    var windshield = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.5, 0.75, 0.08),
+      new THREE.MeshLambertMaterial({ color: conv(0x1d2a38), emissive: conv(0x4a7a9e),
+        emissiveIntensity: 0.3 }));
+    windshield.position.set(0, TRAIN_H - 0.62, frontZ + 0.1);
+    g.add(windshield);
+    var nose = new THREE.Mesh(new THREE.BoxGeometry(TRAIN_W * 2 - 0.3, 0.5, 0.12),
+      lam(0xe8b52e));
+    nose.position.set(0, 0.62, frontZ + 0.06);
+    g.add(nose);
+    for (var hS = -1; hS <= 1; hS += 2) {
+      var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.2, 0.08),
+        new THREE.MeshBasicMaterial({ color: opts.moving ? 0xfff8c8 : 0xd8dde6 }));
+      lamp.position.set(hS * (TRAIN_W - 0.4), 1.12, frontZ + 0.12);
+      g.add(lamp);
+    }
   }
   g.position.set(LANE_X[lane], 0, z);
   scene.add(g);
@@ -519,8 +922,14 @@ function makeTrain(lane, z, len, opts) {
 
 function makeHurdle(lane, z) {
   var g = new THREE.Group();
-  var top = new THREE.Mesh(new THREE.BoxGeometry(LANE_HALF * 2, 0.3, 0.18), MAT.hurdleS);
-  top.position.y = HURDLE_H - 0.15; g.add(top);
+  // red/white striped barrier bar
+  var segW = (LANE_HALF * 2) / 5;
+  for (var i = 0; i < 5; i++) {
+    var seg = new THREE.Mesh(new THREE.BoxGeometry(segW, 0.3, 0.18),
+      i % 2 ? MAT.hurdleWhite : MAT.hurdleS);
+    seg.position.set(-LANE_HALF + segW * (i + 0.5), HURDLE_H - 0.15, 0);
+    g.add(seg);
+  }
   var mid = new THREE.Mesh(new THREE.BoxGeometry(LANE_HALF * 2, 0.18, 0.14), MAT.hurdleW);
   mid.position.y = HURDLE_H - 0.55; g.add(mid);
   for (var s = -1; s <= 1; s += 2) {
@@ -552,11 +961,22 @@ function makeOverhang(lane, z) {
   obstacles.push({ kind: "overhang", mesh: g, lane: lane, halfLen: 0.28, moving: 0 });
 }
 
+var coinFaceMat = (function () {
+  var t = genTex("coin");
+  return t ? new THREE.MeshBasicMaterial({ map: t, transparent: true,
+               alphaTest: 0.35, side: THREE.DoubleSide }) : null;
+})();
+var coinFaceGeo = new THREE.PlaneGeometry(0.95, 0.95);
+
 function makeCoin(lane, z, y) {
   var g = new THREE.Group();
-  var c = new THREE.Mesh(coinGeo, MAT.coin);
-  c.rotation.x = Math.PI / 2;
-  g.add(c);
+  if (coinFaceMat) {
+    g.add(new THREE.Mesh(coinFaceGeo, coinFaceMat));
+  } else {
+    var c = new THREE.Mesh(coinGeo, MAT.coin);
+    c.rotation.x = Math.PI / 2;
+    g.add(c);
+  }
   g.position.set(LANE_X[lane], y, z);
   scene.add(g);
   coins.push({ mesh: g });
@@ -884,6 +1304,7 @@ function resetRun() {
 
   player.group.rotation.set(0, 0, 0);
   player.body.rotation.set(0, 0, 0);
+  player.body.position.set(0, 0, 0);
   guard.group.rotation.set(0, 0, 0);
 
   // pre-fill the track with a clear runway, then patterns
@@ -1038,6 +1459,7 @@ window.addEventListener("touchend", function (e) {
 $("btn-start").addEventListener("click", startGame);
 $("btn-retry").addEventListener("click", startGame);
 $("btn-resume").addEventListener("click", togglePause);
+$("btn-pause").addEventListener("click", togglePause);
 window.addEventListener("blur", function () { if (state === "running") togglePause(); });
 
 /* ------------------------------------------------------------------ *
@@ -1048,6 +1470,13 @@ function playerHeight() { return rollT > 0 ? ROLL_H : STAND_H; }
 function updateWorld(dt) {
   var dz = speed * dt;
   traveled += dz;
+
+  // the ballast slab is a static strip — scroll its texture with the world
+  if (MAT.ballast.map) {
+    var bm = MAT.ballast.map;
+    bm.offset.y += dz * (bm.repeat.y / 320);
+    bm.offset.y -= Math.floor(bm.offset.y);
+  }
 
   ties.forEach(function (t) { t.position.z += dz; if (t.position.z > 16) t.position.z -= 216; });
   fences.forEach(function (f) { f.position.z += dz; if (f.position.z > 22) f.position.z -= 264; });
@@ -1210,7 +1639,7 @@ function updateGuard(dt) {
   var target = stumbleT > 0 ? 1.9 : (traveled < 15 ? 2.6 : 9.5);
   guardZ += (target - guardZ) * Math.min(1, 2.2 * dt);
   guard.group.position.set(px * 0.85, 0, guardZ);
-  animateRun(guard, runPhase * 0.9, 0.85);
+  poseRunner(guard, dt, "run", runPhase * 0.9, 0.85);
   dog.position.set(px * 0.85 + 1.1, Math.abs(Math.sin(runPhase * 0.5)) * 0.18, guardZ + 0.4);
 }
 
@@ -1225,26 +1654,40 @@ function updateVisuals(dt) {
   }
 
   if (state === "dying") {
-    // tumble over
+    // tumble over — pivoted above the feet so nothing sweeps underground
     player.body.rotation.x -= 9 * dt;
+    var thd = LEAN - player.body.rotation.x;
+    player.body.position.y = 0.68 * (1 - Math.cos(thd));
+    player.body.position.z = 0.68 * Math.sin(thd);
     player.group.position.z += 3.5 * dt;
   } else if (rollT > 0) {
-    player.body.rotation.x = LEAN - (1 - rollT / ROLL_TIME) * Math.PI * 2;
-    player.body.scale.y = 0.55;
+    // somersault about the tucked ball's centre (not the feet), so no
+    // limb ever sweeps below the ground plane
+    var th = (1 - rollT / ROLL_TIME) * Math.PI * 2;
+    var pivot = 0.68;
+    player.body.rotation.x = LEAN - th;
+    player.body.scale.y = 0.5;
+    player.body.position.y = pivot * (1 - Math.cos(th));
+    player.body.position.z = pivot * Math.sin(th);
+    poseRunner(player, dt, "tuck");          // curl the limbs into the ball
   } else {
     player.body.rotation.x = LEAN;
     player.body.scale.y = 1;
+    player.body.position.z = 0;
     if (!grounded && pu.jetpack <= 0) {
-      poseAirborne(player);
+      poseRunner(player, dt, "air");
     } else {
       runPhase += speed * dt * 0.85;
-      animateRun(player, runPhase, 1.05);
+      poseRunner(player, dt, "run", runPhase, 1.05);
     }
   }
   // the dog's happy tail
   dog.userData.tail.rotation.y = Math.sin(performance.now() / 90) * 0.5;
   // blink while invincible
   player.group.visible = invincibleT > 0 ? (Math.floor(performance.now() / 90) % 2 === 0) : true;
+
+  // drive Jake (the skinned model overlaying the hidden primitive runner)
+  syncJake(dt);
 
   // camera
   var camY = 4.9 + py * 0.35, camX = px * 0.55;
@@ -1279,6 +1722,8 @@ function updateHud() {
 var lastT = 0;
 function frame(t) {
   requestAnimationFrame(frame);
+  // frozen for a deterministic headless screenshot: re-render, don't advance
+  if (window.__FS_freeze) { renderer.render(scene, camera); return; }
   if (!lastT) { lastT = t; return; }
   var dt = Math.min(0.05, (t - lastT) / 1000);
   lastT = t;
@@ -1297,9 +1742,8 @@ function frame(t) {
     guard.group.position.set(px * 0.85, 0, guardZ);
     if (dyingT > 0.9) showGameOver();
   } else if (state === "menu") {
-    // idle world drift behind the menu
+    // idle jog-in-place behind the menu (updateVisuals poses the runner)
     runPhase += dt * 6;
-    animateRun(player, runPhase, 0.5);
     updateGuard(dt);
   }
 
@@ -1316,6 +1760,45 @@ curLane = targetLane = prevLane = 1;
 elHi.textContent = hiScore;
 
 requestAnimationFrame(frame);
+
+// #autostart (or #shot=<sec>) skips the menu — used by automated
+// screenshots / testing. Exposes a step function so a throttled/hidden tab
+// (or a headless one-shot renderer) can be driven deterministically.
+if (location.hash.indexOf("autostart") >= 0 || location.hash.indexOf("shot=") >= 0) {
+  startGame();
+  window.__FS_step = function (sec) {
+    var n = Math.max(1, Math.round(sec * 60));
+    for (var i = 0; i < n; i++) {
+      if (state === "running") {
+        speed = Math.min(MAX_SPEED, BASE_SPEED + traveled * 0.011);
+        updateWorld(1 / 60); updatePlayer(1 / 60); updateGuard(1 / 60);
+        score += speed * (1 / 60) * mult;
+      } else if (state === "dying") {
+        dyingT += 1 / 60;
+        updateWorld(0.15 / 60);
+        if (caught) guardZ += (0.8 - guardZ) * Math.min(1, 6 / 60);
+        guard.group.position.set(px * 0.85, 0, guardZ);
+        if (dyingT > 0.9) { showGameOver(); break; }
+      } else break;
+      updateVisuals(1 / 60);
+    }
+    updateHud();
+    renderer.render(scene, camera);
+    return state;
+  };
+  // #shot=<sec>[&act=roll|jump|tumble]: advance to a fixed sim time
+  // (optionally triggering an action), then freeze the render so a single
+  // headless screenshot captures an exact, deterministic pose
+  var shotM = location.hash.match(/shot=([\d.]+)/);
+  if (shotM) {
+    window.__FS_step(parseFloat(shotM[1]) || 1);
+    var act = (location.hash.match(/act=(\w+)/) || [])[1];
+    if (act === "roll")   { doRoll();  window.__FS_step(0.28); }
+    if (act === "jump")   { doJump();  window.__FS_step(0.34); }
+    if (act === "tumble") { endGame(false); window.__FS_step(0.45); }
+    window.__FS_freeze = true;
+  }
+}
 
 // lightweight read-only hooks for automated testing / debugging
 window.__FS = {
