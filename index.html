@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fable Surfer</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" class="hidden">
+    <button id="btn-pause" aria-label="Pause"><span></span><span></span></button>
+    <div id="hud-right">
+      <div id="score-row"><span id="mult-row" class="hidden"><span id="mult">×2</span></span><span id="score">0</span></div>
+      <div id="coin-row"><span id="coins">0</span><span id="coin-icon"></span></div>
+      <div id="hi-row"><span class="hud-label">BEST</span><span id="hiscore">0</span></div>
+    </div>
+    <div id="powerups"></div>
+    <div id="board-hint">H / double-tap&nbsp;=&nbsp;hoverboard&nbsp;&nbsp;·&nbsp;&nbsp;M&nbsp;=&nbsp;music</div>
+  </div>
+
+  <!-- Start menu -->
+  <div id="menu" class="overlay">
+    <h1 class="title">FABLE<br>SURFER</h1>
+    <p class="tagline">The inspector saw you tag that train. RUN!</p>
+    <div class="keys">
+      <div><b>◀ ▶</b> switch lane</div>
+      <div><b>▲ / space</b> jump</div>
+      <div><b>▼</b> roll</div>
+      <div><b>H</b> hoverboard</div>
+      <div class="touch-note">on touch: swipe / double-tap</div>
+    </div>
+    <button id="btn-start" class="big-btn">PLAY</button>
+    <p class="footnote">best: <span id="menu-hi">0</span></p>
+  </div>
+
+  <!-- Game over -->
+  <div id="gameover" class="overlay hidden">
+    <h1 class="title small" id="go-title">BUSTED!</h1>
+    <div class="results">
+      <div><span class="hud-label">SCORE</span><span id="go-score">0</span></div>
+      <div><span class="hud-label">COINS</span><span id="go-coins">0</span></div>
+      <div><span class="hud-label">BEST</span><span id="go-hi">0</span></div>
+    </div>
+    <div id="new-record" class="hidden">★ NEW RECORD ★</div>
+    <button id="btn-retry" class="big-btn">RUN AGAIN</button>
+    <p class="footnote">or press R</p>
+  </div>
+
+  <!-- Pause -->
+  <div id="paused" class="overlay hidden">
+    <h1 class="title small">PAUSED</h1>
+    <button id="btn-resume" class="big-btn">RESUME</button>
+    <p class="footnote">or press P / Esc</p>
+  </div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/char-textures.js"></script>
+<script src="js/jake-model.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
